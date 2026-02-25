@@ -68,6 +68,10 @@ const userSchema = new Schema({
   type: Boolean,
   default: false
   },
+  address: {
+    type: String,
+    default: null
+  },
 
   // ===== Employee only =====
   empId: {
@@ -128,6 +132,12 @@ const userSchema = new Schema({
     type: Boolean,
     default: false
   },
+  
+  isActive: {
+    type: Boolean,
+    default: true
+  },
+
   resetPasswordToken: {
     type: String,
     default: null
@@ -137,7 +147,6 @@ const userSchema = new Schema({
     type: Date,
     default: null
   },
-
  
   verificationTokenExpiry: {
     type: Date,

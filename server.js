@@ -7,6 +7,9 @@ const PORT = process.env.PORT || 5000;
 // Connect MongoDB
 connectDB();
 
+// after mongoose.connect(...) and connection established
+require('./seeders/seedGrepgraphy');
+
 app.use((err, req, res, next) => {
   console.error(err);
   res.status(err.status || 500).json({

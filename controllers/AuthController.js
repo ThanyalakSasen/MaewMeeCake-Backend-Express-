@@ -277,7 +277,8 @@ exports.login = async (req, res, next) => {
     
     // หา user และดึง password มาด้วย
     const user = await UserModel.findOne({ 
-  email: email.toLowerCase(), 
+  email: email.toLowerCase(),
+  softDelete: false, 
   isActive: true 
 }).select('+password');
     

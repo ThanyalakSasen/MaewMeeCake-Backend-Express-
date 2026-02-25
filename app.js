@@ -12,13 +12,13 @@ const connectDB = require("./config/db");
 // ===== init =====
 connectDB();
 require("./config/passport");
-require("./models/UsersModel");
+require("./models/usersModel");
 
 const authRoutes = require("./routes/AuthRoutes");
 const emailRoutes = require("./routes/EmailRouts");
 const userRoutes = require("./routes/UserRoutes");
 const recipeRoutes = require("./routes/RecipsRoutes");
-const categoryRoutes = require("./routes/CategoryRoutes");
+const ProductCategoryRoutes = require("./routes/ProductCategoryRoutes");
 const ingredientRoutes = require("./routes/IngredientRoutes");
 const productRoutes = require("./routes/ProductRoutes");
 const positionRoutes = require("./routes/PostitionRoutes");
@@ -67,14 +67,14 @@ app.get('/.well-known/appspecific/com.chrome.devtools.json', (req, res) => {
   res.status(204).end();
 });
 
-app.use("/api/auth", authRoutes);
-app.use("/api/email", emailRoutes);
-app.use("/api/user", userRoutes);
-app.use("/api/recipe", recipeRoutes);
-app.use("/api/category", categoryRoutes);
-app.use("/api/ingredient", ingredientRoutes);
-app.use("/api/product", productRoutes);
-app.use("/api/position", positionRoutes);
+app.use("/auth", authRoutes);
+app.use("/email", emailRoutes);
+app.use("/user", userRoutes);
+app.use("/recipe", recipeRoutes);
+app.use("/ProductCategoryRoutes", ProductCategoryRoutes);
+app.use("/ingredient", ingredientRoutes);
+app.use("/product", productRoutes);
+app.use("/position", positionRoutes);
 
 app.use((err, req, res, next) => {
   console.error(err.stack);

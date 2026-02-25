@@ -324,7 +324,7 @@ exports.softDeleteEmployee = async (req, res, next) => {
     }
 
     employee.softDelete = true;
-    employee.isActive = false;
+    employee.isActive = false; // อาจจะยังคงสถานะ active ไว้เพื่อให้สามารถกู้คืนได้ง่าย
     employee.deletedAt = new Date();
 
     await employee.save({ validateBeforeSave: false });

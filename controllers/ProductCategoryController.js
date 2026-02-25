@@ -1,11 +1,11 @@
-const categoryModel = require("../models/CategoryModel");
+const ProductCategoryModel = require("../models/ProductCategoryModel");
 
-exports.createCategory = async (req, res) => {
+exports.createProductCategory = async (req, res) => {
   try {
     const { name } = req.body;
 
-    const newCategory = new categoryModel({
-      category_name: name,
+    const newCategory = new ProductCategoryModel({
+      productCategory_name: name,
     });
     const savedCategory = await newCategory.save();
     res.status(201).json({
@@ -22,12 +22,12 @@ exports.createCategory = async (req, res) => {
   }
 };
 
-exports.getAllCategories = async (req, res) => {
+exports.getAllProductCategories = async (req, res) => {
   try {
-    const categories = await categoryModel.find();
+    const ProductCategories = await ProductCategoryModel.find();
     res.status(200).json({
       success: true,
-      data: categories,
+      data: ProductCategories,
     });
   } catch (error) {
     res.status(500).json({
@@ -37,11 +37,11 @@ exports.getAllCategories = async (req, res) => {
     });
   }
 };
-exports.getCategoryById = async (req, res) => {
+exports.getProductCategoryById = async (req, res) => {
   try {
     const { id } = req.params;
-    const category = await categoryModel.findById(id);
-    if (!category) {
+    const ProductCategory = await ProductCategoryModel.findById(id);
+    if (!ProductCategory) {
       return res.status(404).json({
         success: false,
         message: "ไม่พบหมวดหมู่ที่ต้องการ",
@@ -49,7 +49,7 @@ exports.getCategoryById = async (req, res) => {
     }
     res.status(200).json({
       success: true,
-      data: category,
+      data: ProductCategory,
     });
   } catch (error) {
     res.status(500).json({
@@ -60,16 +60,16 @@ exports.getCategoryById = async (req, res) => {
   }
 };
 
-exports.updateCategory = async (req, res) => {
+exports.updateProductCategory = async (req, res) => {
   try {
     const { id } = req.params;
     const { name } = req.body;
-    const updatedCategory = await categoryModel.findByIdAndUpdate(
+    const updatedProductCategory = await ProductCategoryModel.findByIdAndUpdate(
       id,
-      { category_name: name },
+      { productCategory_name: name },
       { new: true },
     );
-    if (!updatedCategory) {
+    if (!updatedProductCategory) {
       return res.status(404).json({
         success: false,
         message: "ไม่พบหมวดหมู่ที่ต้องการอัพเดต",
@@ -89,11 +89,11 @@ exports.updateCategory = async (req, res) => {
   }
 };
 
-exports.deleteCategory = async (req, res) => {
+exports.deleteProductCategory = async (req, res) => {
   try {
     const { id } = req.params;
-    const deletedCategory = await categoryModel.findByIdAndDelete(id);
-    if (!deletedCategory) {
+    const deletedProductCategory = await ProductCategoryModel.findByIdAndDelete(id);
+    if (!deletedProductCategory) {
       return res.status(404).json({
         success: false,
         message: "ไม่พบหมวดหมู่ที่ต้องการลบ",
@@ -102,7 +102,7 @@ exports.deleteCategory = async (req, res) => {
     res.status(200).json({
       success: true,
       message: "ลบหมวดหมู่สำเร็จ",
-      data: deletedCategory,
+      data: deletedProductCategory,
     });
   } catch (error) {
     res.status(500).json({
