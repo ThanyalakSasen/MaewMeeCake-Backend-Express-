@@ -4,7 +4,7 @@ const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 
-const authCtrl = require("../controllers/authController");
+const authCtrl = require("../controllers/AuthController");
 const { protect } = require("../middlewares/authMiddleware");
 
 // Public routes

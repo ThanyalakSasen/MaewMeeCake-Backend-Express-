@@ -1,4 +1,4 @@
-const UserModel = require("../models/UsersModel");
+﻿const UserModel = require("../models/usersModel");
 const PositionModel = require("../models/PositionModel");
 const mongoose = require("mongoose");
 const jwt = require("jsonwebtoken");
@@ -88,7 +88,7 @@ exports.register = async (req, res, next) => {
     }
     
     // ตรวจสอบว่ามี email นี้แล้วหรือยัง
-    const existingUser = await User.findOne({ email });
+    const existingUser = await UserModel.findOne({ email });
     if (existingUser) {
       return res.status(400).json({
         success: false,
@@ -102,7 +102,7 @@ exports.register = async (req, res, next) => {
             .update(token)
             .digest("hex");
     // สร้าง user ใหม่
-    const user = await User.create({
+    const user = await UserModel.create({
       user_fullname,
       email,
       password,
@@ -338,7 +338,7 @@ exports.verifyEmail = async (req, res) => {
     
     const hashedToken = crypto.createHash('sha256').update(req.params.token).digest('hex');
     
-    const user = await User.findOne({
+    const user = await UserModel.findOne({
       emailVerifyToken: hashedToken,
       verificationTokenExpiry: { $gt: Date.now() }
     });
@@ -382,7 +382,7 @@ exports.resendVerification = async (req, res, next) => {
   try {
     const { email } = req.body;
     
-    const user = await User.findOne({ email, isActive: true });
+    const user = await UserModel.findOne({ email, isActive: true });
     
     if (!user) {
       return res.status(404).json({
@@ -530,7 +530,7 @@ exports.forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
 
-    const user = await User.findOne({ email, isActive: true });
+    const user = await UserModel.findOne({ email, isActive: true });
     if (!user) {
       return res.status(404).json({ message: "ไม่พบอีเมลนี้ในระบบ" });
     }
@@ -639,7 +639,7 @@ exports.resetPassword = async (req, res) => {
       .update(req.params.token)
       .digest("hex");
 
-    const user = await User.findOne({
+    const user = await UserModel.findOne({
       resetPasswordToken: hashedToken,
       resetPasswordTokenExpiry: { $gt: Date.now() },
     });
@@ -676,7 +676,7 @@ exports.verifyResetToken = async (req, res) => {
       .update(req.params.token)
       .digest("hex");
 
-    const user = await User.findOne({
+    const user = await UserModel.findOne({
       resetPasswordToken: hashedToken,
       resetPasswordTokenExpiry: { $gt: Date.now() },
     });
@@ -709,7 +709,7 @@ exports.getMe = async (req, res, next) => {
       });
     }
     
-    console.log('=== GET /api/auth/me ===');
+    console.log('=== GET /auth/me ===');
     console.log('User ID:', user._id);
     console.log('Email:', user.email);
     console.log('profileCompleted:', user.profileCompleted);
@@ -720,7 +720,7 @@ exports.getMe = async (req, res, next) => {
       user: {
         id: user._id,
         email: user.email,
-        user_fullname: user.user_fullname,  // ✅ ใช้ชื่อเดียวกับ DB
+        user_fullname: user.user_fullname,  // ใช้ชื่อเดียวกับ DB
         role: user.role,
         user_phone: user.user_phone,
         user_birthdate: user.user_birthdate,
@@ -728,7 +728,7 @@ exports.getMe = async (req, res, next) => {
         user_img: user.user_img,
         isEmailVerified: user.isEmailVerified,
         authProvider: user.authProvider,
-        profileCompleted: user.profileCompleted  // ✅ สำคัญมาก!
+        profileCompleted: user.profileCompleted  // สำคัญมาก!
       }
     });
   } catch (error) {
@@ -769,10 +769,10 @@ exports.googleAuth = passport.authenticate('google', {
 exports.googleAuthCallback = (req, res, next) => {
   passport.authenticate('google', { session: false }, async (err, user) => {
 
-    console.log("🔥 GOOGLE CALLBACK USER:");
-    console.log("ID:", user?._id);
-    console.log("Email:", user?.email);
-    console.log("profileCompleted:", user?.profileCompleted);
+    // console.log("🔥 GOOGLE CALLBACK USER:");
+    // console.log("ID:", user?._id);
+    // console.log("Email:", user?.email);
+    // console.log("profileCompleted:", user?.profileCompleted);
 
     if (err || !user) {
       console.log("❌ GOOGLE AUTH FAILED");
@@ -799,7 +799,7 @@ exports.completeProfile = async (req, res, next) => {
   try {
     const { user_phone, user_birthdate, user_allergies } = req.body;
     
-    const user = await User.findById(req.user.id);
+    const user = await UserModel.findById(req.user.id);
     
     if (!user) {
       return res.status(404).json({
@@ -820,7 +820,7 @@ exports.completeProfile = async (req, res, next) => {
     user.user_phone = user_phone;
     user.user_birthdate = user_birthdate;
     user.user_allergies = user_allergies || [];
-    user.profileCompleted = true; // ✅ สำคัญมาก!
+    user.profileCompleted = true; // สำคัญมาก!
     
     await user.save({ validateBeforeSave: false });
     
@@ -853,7 +853,7 @@ exports.updateProfileCustomer = async (req, res, next) => {
   try {
     const { user_phone, user_birthdate, user_allergies } = req.body;
     
-    const user = await User.findById(req.user.id);
+    const user = await UserModel.findById(req.user.id);
     
     if (!user) {
       return res.status(404).json({

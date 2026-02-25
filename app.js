@@ -13,17 +13,17 @@ const connectDB = require("./config/db");
 connectDB();
 require("./config/passport");
 require("./models/usersModel");
+require("./models/PositionModel");
 
 const authRoutes = require("./routes/AuthRoutes");
-const emailRoutes = require("./routes/EmailRouts");
+const addressRoutes = require("./routes/AddressRoute");
+const emailRoutes = require("./routes/EmailRoutes");
 const userRoutes = require("./routes/UserRoutes");
-const recipeRoutes = require("./routes/RecipsRoutes");
+const recipeRoutes = require("./routes/RecipesRoutes");
 const ProductCategoryRoutes = require("./routes/ProductCategoryRoutes");
 const ingredientRoutes = require("./routes/IngredientRoutes");
 const productRoutes = require("./routes/ProductRoutes");
-const positionRoutes = require("./routes/PostitionRoutes");
-
-
+const positionRoutes = require("./routes/PositionRoutes");
 
 
 const app = express();
@@ -71,16 +71,19 @@ app.use("/auth", authRoutes);
 app.use("/email", emailRoutes);
 app.use("/user", userRoutes);
 app.use("/recipe", recipeRoutes);
-app.use("/ProductCategoryRoutes", ProductCategoryRoutes);
+app.use("/product-category", ProductCategoryRoutes);
 app.use("/ingredient", ingredientRoutes);
 app.use("/product", productRoutes);
 app.use("/position", positionRoutes);
+app.use("/address", addressRoutes);
 
+// Global error handling middleware (เก็บไว้เพียงที่เดียว)
 app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(err.statusCode || 500).json({
-    success: false,
-    message: err.message || 'Server Error'
-  });
+    console.error(err.stack);
+    res.status(err.status || 500).json({
+        message: err.message || 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? err : {}
+    });
 });
+
 module.exports = app;

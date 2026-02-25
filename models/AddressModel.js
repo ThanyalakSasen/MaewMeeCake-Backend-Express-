@@ -1,9 +1,15 @@
 // addressSchema.js
 const mongoose = require("mongoose");
+const usersModel = require("./usersModel");
 const Schema = mongoose.Schema;
 
 const addressSchema = new Schema(
   {
+    users_id: {
+      type: Schema.Types.ObjectId,
+      ref: "Users",
+      required: true,
+    },
     label: {
       type: String,
       enum: ["home", "office", "other"],

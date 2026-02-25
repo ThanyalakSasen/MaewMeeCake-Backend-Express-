@@ -1,4 +1,4 @@
-const recipesController = require('../controllers/RecipsController');
+const recipesController = require('../controllers/RecipesController');
 const express = require('express');
 const router = express.Router();
 const { protect } = require('../middlewares/authMiddleware');

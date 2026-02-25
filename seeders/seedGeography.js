@@ -10,7 +10,8 @@ const seedGrepgraphy = async () => {
         await geographyModel.deleteMany({});
         await geographyModel.insertMany(geopaphyData);
         console.log(`Geography data seeded สำเร็จแล้วน่ะจ๊ะ! จำนวนที่เพิ่มคือ ${geopaphyData.length} records.`);
-        process.exit(0);
+        //ทำให้ Server ดับ
+        //process.exit(0);
     }catch (error) {
         console.error('Error seeding geography data:', error);
         process.exit(1);

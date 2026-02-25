@@ -1,6 +1,23 @@
 const productModel = require("../models/ProductModel");
 const recipeModel = require("../models/RecipesModel");
+const fs = require("fs");
+const path = require("path");
 
+// สร้างโฟลเดอร์ uploads/products ถ้ายังไม่มี
+const uploadDir = path.join(__dirname, "../uploads/products");
+//__dirname เป็น path ของโฟลเดอร์ที่ไฟล์ปัจจุบันอยู่ โดย Node.js จะกำหนดให้อัตโนมัติ
+// เป็นเหมือน การระบุว่าตอนนี้อยู่ในโฟลเดอร์ controllers 
+// ดังนั้น ../uploads/products จะหมายถึง โฟลเดอร์ uploads/products ที่อยู่ข้างนอก controllers
+// ตัวอย่างเช่น ถ้าโครงสร้างโปรเจคเป็นแบบนี้:
+// - controllers/
+//   - ProductController.js  <-- __dirname จะเป็น path ของโฟลเดอร์นี้
+// - uploads/
+//   - products/           <-- ../uploads/products จะหมายถึงโฟลเดอร์นี้
+console.log(__dirname);
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+  console.log("📁 Created directory:", uploadDir);
+}
 // Create a new product
 exports.createProduct = async (req, res) => {
   try {
@@ -31,20 +48,6 @@ exports.createProduct = async (req, res) => {
       product_img,
       recipe_id
     });
-
-    // Skip recipe validation for now since we don't have real recipes yet
-    // Validate recipe_id if provided
-    // if (recipe_id && recipe_id !== "") {
-    //   try {
-    //     const recipeExists = await recipeModel.findById(recipe_id);
-    //     if (!recipeExists) {
-    //       return res.status(400).json({ message: "ไม่พบสูตรอาหารที่ระบุ" });
-    //     }
-    //   } catch (err) {
-    //     console.log("Invalid recipe_id format:", recipe_id);
-    //     return res.status(400).json({ message: "รูปแบบ ID สูตรอาหารไม่ถูกต้อง" });
-    //   }
-    // }
 
     if (
       !product_name_th ||
