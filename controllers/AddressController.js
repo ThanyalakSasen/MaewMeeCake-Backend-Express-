@@ -1,72 +1,85 @@
-const addressModel = require('../models/AddressModel');
+const Address = require('../models/AddressModel');
 
-exports.createAddress = async (req, res) => {
+// @desc    สร้างที่อยู่ใหม่
+// @route   POST /api/address
+// @access  Private
+exports.createAddress = async (req, res, next) => {
+  try {
+    const { label, address_line, sub_district, district, province, postal_code } = req.body;
+    const user_id = req.user._id;
+
+    const newAddress = new Address({
+      user_id,
+      label,
+      address_line,
+      sub_district,
+      district,
+      province,
+      postal_code
+    });
+
+    const savedAddress = await newAddress.save();
+    res.status(201).json(savedAddress);
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    ดึงที่อยู่ทั้งหมดของผู้ใช้
+// @route   GET /api/address
+// @access  Private
+exports.getAllAddressesByUserId = async (req, res, next) => {
     try {
-        const { user_id, label, address_line, geography_id, is_default } = req.body;
-        const newAddress = new addressModel({
-
-            user_id,
-            label,
-            address_line,
-            geography_id,
-            is_default,
-        });
-        await newAddress.save();
-        res.status(201).json({ message: 'Address created successfully', address: newAddress });
-    } catch (error) {
-        console.error('Error creating address:', error);
-        res.status(500).json({ message: 'Internal server error' });
+        const user_id = req.user._id;
+        const addresses = await Address.find({ user_id });
+        res.json(addresses);
+    } catch (error) { 
+       next(error);
     }
 };
 
-exports.getUserAddressById = async (req, res) => {
+// @desc    ดึงที่อยู่ตาม ID
+// @route   GET /api/address/:id
+// @access  Private
+exports.getAddressById = async (req, res, next) => {
     try {
-        const { id, user_id } = req.params;
-
-        const address = await addressModel.findOne({
-            _id: id,
-            user_id: user_id
-        });
-
+        const address = await Address.findById(req.params.id);
         if (!address) {
-            return res.status(404).json({ message: 'ไม่พบที่อยู่ที่ระบุ' });
+            return res.status(404).json({ message: 'Address not found' });
         }
-        res.status(200).json(address);
-    } catch (error) {
-        console.error('Error fetching address:', error);
-        res.status(500).json({ message: 'Internal server error' });
+        res.json(address);
+    }
+    catch (error) {
+        next(error);
     }
 };
 
-exports.deleteAddress = async (req, res) => {
+// @desc    อัพเดตที่อยู่ตาม ID
+// @route   PUT /api/address/:id
+// @access  Private
+exports.updateAddress = async (req, res, next) => {
     try {
-        const { id } = req.params;
-        const deletedAddress = await addressModel.findByIdAndDelete(id);
-        if (!deletedAddress) {
-            return res.status(404).json({ message: 'ไม่พบที่อยู่ที่ระบุ' });
-        }
-        res.status(200).json({ message: 'Address deleted successfully' });
-    } catch (error) {
-        console.error('Error deleting address:', error);
-        res.status(500).json({ message: 'Internal server error' });
-    }
-};
-
-exports.updateAddress = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { label, address_line, geography_id, is_default } = req.body;
-        const updatedAddress = await addressModel.findByIdAndUpdate(
-            id, 
-            { label, address_line, geography_id, is_default },
-            { new: true }
-        );
+        const updatedAddress = await Address.findByIdAndUpdate(req.params.id, req.body, { new: true });
         if (!updatedAddress) {
-            return res.status(404).json({ message: 'ไม่พบที่อยู่ที่ระบุ' });
+            return res.status(404).json({ message: 'Address not found' });
         }
-        res.status(200).json({ message: 'Address updated successfully', address: updatedAddress });
+        res.json(updatedAddress);
     } catch (error) {
-        console.error('Error updating address:', error);
-        res.status(500).json({ message: 'Internal server error' });
+        next(error);
+    }
+};
+
+// @desc    ลบที่อยู่ตาม ID
+// @route   DELETE /api/address/:id
+// @access  Private
+exports.deleteAddress = async (req, res, next) => {
+    try {
+        const deletedAddress = await Address.findByIdAndDelete(req.params.id);
+        if (!deletedAddress) {
+            return res.status(404).json({ message: 'Address not found' });
+        }
+        res.json({ message: 'Address deleted successfully' });
+    } catch (error) {
+        next(error);
     }
 };

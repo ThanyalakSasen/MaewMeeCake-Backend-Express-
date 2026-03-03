@@ -1,8 +1,5 @@
 const express = require("express");
 const router = express.Router();
-const multer = require("multer");
-const path = require("path");
-const fs = require("fs");
 
 const authCtrl = require("../controllers/AuthController");
 const { protect } = require("../middlewares/authMiddleware");
