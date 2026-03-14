@@ -2,7 +2,7 @@ const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const LocalStrategy = require('passport-local').Strategy;
 const bcrypt = require('bcryptjs');
-const User = require('../models/usersModel');
+const User = require('../models/UsersModel');
 
 // Local Strategy
 passport.use(
@@ -12,8 +12,8 @@ passport.use(
       try {
         const user = await User.findOne({
           email: email.toLowerCase(),
-          authProvider: 'local',
-          isActive: true
+          auth_provider: 'local',
+          is_active: true
         }).select('+password');
 
         if (!user) {
@@ -22,7 +22,7 @@ passport.use(
           });
         }
 
-        if (!user.isEmailVerified) {
+        if (!user.is_email_verified) {
           return done(null, false, {
             message: 'กรุณายืนยันอีเมลก่อนเข้าสู่ระบบ'
           });
@@ -49,7 +49,7 @@ passport.use(
     {
       clientID: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      callbackURL: '/api/auth/google/callback'
+      callbackURL: '/auth/google/callback'
     },
     async (accessToken, refreshToken, profile, done) => {
       console.log("✅ GOOGLE PROFILE:", profile.id, profile.emails[0].value);
@@ -63,12 +63,12 @@ passport.use(
             googleId: profile.id,
             email: profile.emails[0].value,
             user_fullname: profile.displayName,
-            authProvider: 'google',
+            auth_provider: 'google',
             role: 'Customer',
-            isEmailVerified: true,      // ✅ Google verify แล้ว
-            profileCompleted: false,    // ✅ ยังไม่ได้กรอกข้อมูล
+            is_email_verified: true,      // ✅ Google verify แล้ว
+            profile_completed: false,    // ✅ ยังไม่ได้กรอกข้อมูล
             user_img: profile.photos?.[0]?.value || null,
-            isActive: true
+            is_active: true
           });
           
           console.log('✅ Created new Google user:', user.email);

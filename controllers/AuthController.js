@@ -1,4 +1,4 @@
-﻿const UserModel = require("../models/usersModel");
+﻿const UserModel = require("../models/UsersModel");
 const PositionModel = require("../models/PositionModel");
 const mongoose = require("mongoose");
 const jwt = require("jsonwebtoken");
@@ -6,6 +6,7 @@ const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
 const sendVerifyEmail = require("../utils/sendVerifyEmail");
 const passport = require("passport");
+const AddressModel = require("../models/AddressModel");
 
 const resolvePositionId = async (emp_position) => {
   if (!emp_position) return undefined;
@@ -52,7 +53,7 @@ const sendTokenResponse = (user, statusCode, res) => {
       email: user.email,
       name: user.user_fullname,
       role: user.role,
-      isVerified: user.isEmailVerified
+      isVerified: user.is_email_verified
     }
   });
 };
@@ -62,14 +63,22 @@ const sendTokenResponse = (user, statusCode, res) => {
 // @access  Public
 exports.register = async (req, res, next) => {
   try {
-    const { 
-      user_fullname, 
-      email, 
-      password, 
-      user_phone, 
-      user_birthdate, 
+    const {
+      user_fullname,
+      email,
+      password,
+      user_phone,
+      user_birthdate,
       user_allergies,
-      
+      googleId,
+      houseNumber,
+      address,
+      address_line,
+      address_line1,
+      sub_district,
+      district,
+      province,
+      postal_code,
     } = req.body;
     
     // Validation
@@ -88,7 +97,8 @@ exports.register = async (req, res, next) => {
     }
     
     // ตรวจสอบว่ามี email นี้แล้วหรือยัง
-    const existingUser = await UserModel.findOne({ email });
+    const normalizedEmail = email.toLowerCase();
+    const existingUser = await UserModel.findOne({ email: normalizedEmail });
     if (existingUser) {
       return res.status(400).json({
         success: false,
@@ -104,19 +114,69 @@ exports.register = async (req, res, next) => {
     // สร้าง user ใหม่
     const user = await UserModel.create({
       user_fullname,
-      email,
+      email: normalizedEmail,
       password,
       user_phone,
       user_birthdate,
       user_allergies: user_allergies || [],
-      authProvider: 'local',
+      googleId: googleId || null,
+      auth_provider: googleId ? 'google' : 'local',
       role: 'Customer',
-      isEmailVerified: false,
-      profileCompleted: true ,
-      emailVerifyToken: hashedToken, 
-      verificationTokenExpiry: Date.now() + 24 * 60 * 60 * 1000, // 24 ชม.
-      isActive: true
+      is_email_verified: false,
+      profile_completed: true,
+      email_verify_token: hashedToken,
+      verification_token_expiry: Date.now() + 24 * 60 * 60 * 1000,
+      is_active: true
     });
+
+    const addressPayload = {
+      address_line:
+        address_line ||
+        address_line1 ||
+        houseNumber ||
+        address?.address_line ||
+        address?.address_line1 ||
+        address?.addressLine ||
+        "",
+      sub_district:
+        sub_district ||
+        address?.sub_district ||
+        address?.subdistrictNameTh ||
+        address?.subDistrict ||
+        address?.tambon ||
+        "",
+      district:
+        district ||
+        address?.district ||
+        address?.districtNameTh ||
+        address?.amphoe ||
+        "",
+      province:
+        province ||
+        address?.provinceNameTh ||
+        address?.province ||
+        "",
+      postal_code:
+        postal_code ||
+        address?.postal_code ||
+        address?.postalCode ||
+        address?.zipcode ||
+        "",
+    };
+
+    if (
+      addressPayload.address_line &&
+      addressPayload.sub_district &&
+      addressPayload.district &&
+      addressPayload.province &&
+      addressPayload.postal_code
+    ) {
+      await AddressModel.create({
+        user_id: user._id,
+        label: "home",
+        ...addressPayload,
+      });
+    }
     
     
     // ส่งอีเมลยืนยัน
@@ -241,8 +301,8 @@ exports.register = async (req, res, next) => {
       });
     } catch (err) {
       console.error('Email Error:', err);
-      user.emailVerifyToken = undefined;
-      user.verificationTokenExpiry = undefined;
+      user.email_verify_token = undefined;
+      user.verification_token_expiry = undefined;
       await user.save({ validateBeforeSave: false });
       
       return res.status(500).json({
@@ -279,7 +339,7 @@ exports.login = async (req, res, next) => {
     const user = await UserModel.findOne({ 
   email: email.toLowerCase(),
   softDelete: false, 
-  isActive: true 
+      is_active: true 
 }).select('+password');
     
     if (!user) {
@@ -293,7 +353,7 @@ exports.login = async (req, res, next) => {
     console.log("Login Debug: User found, hashing comparison starts...");
     
     // ตรวจสอบว่าเป็น local account หรือไม่
-    if (user.authProvider !== 'local' || !user.password) {
+    if (user.auth_provider !== 'local' || !user.password) {
       return res.status(401).json({
         success: false,
         message: 'บัญชีนี้ลงทะเบียนผ่าน Google กรุณาใช้ Sign in with Google'
@@ -311,7 +371,7 @@ exports.login = async (req, res, next) => {
     }
     
     // เตือนถ้ายังไม่ verify email
-    if (!user.isEmailVerified) {
+    if (!user.is_email_verified) {
       return res.status(403).json({
         success: false,
         message: 'กรุณายืนยันอีเมลก่อนเข้าสู่ระบบ',
@@ -339,22 +399,22 @@ exports.verifyEmail = async (req, res) => {
     const hashedToken = crypto.createHash('sha256').update(req.params.token).digest('hex');
     
     const user = await UserModel.findOne({
-      emailVerifyToken: hashedToken,
-      verificationTokenExpiry: { $gt: Date.now() }
+      email_verify_token: hashedToken,
+      verification_token_expiry: { $gt: Date.now() }
     });
     
     if (!user) {
      
-      console.log("Verify Failed: Token invalid or expired", verificationToken);
+      console.log("Verify Failed: Token invalid or expired");
       return res.status(400).json({
         success: false,
         message: 'ลิงก์ยืนยันไม่ถูกต้องหรือหมดอายุแล้ว'
       });
     }
     
-    user.isEmailVerified = true;
-    user.emailVerifyToken = undefined;
-    user.verificationTokenExpiry = undefined;
+    user.is_email_verified = true;
+    user.email_verify_token = undefined;
+    user.verification_token_expiry = undefined;
     
     // สำคัญ: ใส่ validateBeforeSave เพื่อไม่ให้กระทบ Password
     await user.save({ validateBeforeSave: false });
@@ -382,7 +442,7 @@ exports.resendVerification = async (req, res, next) => {
   try {
     const { email } = req.body;
     
-    const user = await UserModel.findOne({ email, isActive: true });
+    const user = await UserModel.findOne({ email: email.toLowerCase(), is_active: true });
     
     if (!user) {
       return res.status(404).json({
@@ -391,7 +451,7 @@ exports.resendVerification = async (req, res, next) => {
       });
     }
     
-    if (user.isEmailVerified) {
+    if (user.is_email_verified) {
       return res.status(400).json({
         success: false,
         message: 'อีเมลนี้ได้รับการยืนยันแล้ว'
@@ -482,7 +542,7 @@ exports.resendVerification = async (req, res, next) => {
     </div>
     
     <div class="content">
-      <span class="user-name">สวัสดีคุณ <strong>${user_fullname}</strong> 🐱</span>
+      <span class="user-name">สวัสดีคุณ <strong>${user.user_fullname}</strong> 🐱</span>
       <p>ยินดีต้อนรับสู่ครอบครัวเหมียวมีนะคะ!<br>
       กรุณากดปุ่มด้านล่างเพื่อยืนยันอีเมลและเริ่มสั่งขนมได้เลยค่ะ</p>
       
@@ -530,12 +590,12 @@ exports.forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
 
-    const user = await UserModel.findOne({ email, isActive: true });
+    const user = await UserModel.findOne({ email: email.toLowerCase(), is_active: true });
     if (!user) {
       return res.status(404).json({ message: "ไม่พบอีเมลนี้ในระบบ" });
     }
 
-    if (user.authProvider !== "local") {
+    if (user.auth_provider !== "local") {
       return res.status(400).json({
         message: "บัญชีนี้เข้าสู่ระบบด้วย Google",
       });
@@ -640,8 +700,8 @@ exports.resetPassword = async (req, res) => {
       .digest("hex");
 
     const user = await UserModel.findOne({
-      resetPasswordToken: hashedToken,
-      resetPasswordTokenExpiry: { $gt: Date.now() },
+      reset_password_token: hashedToken,
+      reset_password_token_expiry: { $gt: Date.now() },
     });
 
     if (!user) {
@@ -658,8 +718,8 @@ exports.resetPassword = async (req, res) => {
     }
 
     user.password = password;
-    user.resetPasswordToken = undefined;
-    user.resetPasswordTokenExpiry = undefined;
+    user.reset_password_token = undefined;
+    user.reset_password_token_expiry = undefined;
     await user.save();
 
     res.json({ message: "รีเซ็ตรหัสผ่านสำเร็จ" });
@@ -677,8 +737,8 @@ exports.verifyResetToken = async (req, res) => {
       .digest("hex");
 
     const user = await UserModel.findOne({
-      resetPasswordToken: hashedToken,
-      resetPasswordTokenExpiry: { $gt: Date.now() },
+      reset_password_token: hashedToken,
+      reset_password_token_expiry: { $gt: Date.now() },
     });
 
     if (!user) {
@@ -712,7 +772,7 @@ exports.getMe = async (req, res, next) => {
     console.log('=== GET /auth/me ===');
     console.log('User ID:', user._id);
     console.log('Email:', user.email);
-    console.log('profileCompleted:', user.profileCompleted);
+    console.log('profileCompleted:', user.profile_completed);
     console.log('========================');
     
     res.status(200).json({
@@ -726,9 +786,9 @@ exports.getMe = async (req, res, next) => {
         user_birthdate: user.user_birthdate,
         user_allergies: user.user_allergies,
         user_img: user.user_img,
-        isEmailVerified: user.isEmailVerified,
-        authProvider: user.authProvider,
-        profileCompleted: user.profileCompleted  // สำคัญมาก!
+        isEmailVerified: user.is_email_verified,
+        authProvider: user.auth_provider,
+        profileCompleted: user.profile_completed
       }
     });
   } catch (error) {
@@ -785,7 +845,7 @@ exports.googleAuthCallback = (req, res, next) => {
     console.log("🔑 GENERATED TOKEN:", token);
 
     
-    const redirectUrl = `${process.env.FRONTEND_URL}/auth/callback?token=${token}&profileCompleted=${user.profileCompleted}`;
+    const redirectUrl = `${process.env.FRONTEND_URL}/auth/callback?token=${token}&profileCompleted=${user.profile_completed}`;
 
 
     console.log("➡️ REDIRECT TO:", redirectUrl);
@@ -820,7 +880,7 @@ exports.completeProfile = async (req, res, next) => {
     user.user_phone = user_phone;
     user.user_birthdate = user_birthdate;
     user.user_allergies = user_allergies || [];
-    user.profileCompleted = true; // สำคัญมาก!
+    user.profile_completed = true;
     
     await user.save({ validateBeforeSave: false });
     
@@ -834,7 +894,7 @@ exports.completeProfile = async (req, res, next) => {
         phone: user.user_phone,
         birthDate: user.user_birthdate,
         allergies: user.user_allergies,
-        profileCompleted: user.profileCompleted
+        profileCompleted: user.profile_completed
       }
     });
   } catch (error) {

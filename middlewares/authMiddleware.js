@@ -1,6 +1,6 @@
 // middleware/auth.js
 const jwt = require('jsonwebtoken');
-const User = require('../models/usersModel');
+const User = require('../models/UsersModel');
 
 exports.protect = async (req, res, next) => {
   let token;
@@ -23,7 +23,7 @@ exports.protect = async (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     req.user = await User.findById(decoded.id);
     
-    if (!req.user || !req.user.isActive) {
+    if (!req.user || !req.user.is_active) {
       return res.status(401).json({
         success: false,
         message: 'ไม่พบผู้ใช้หรือบัญชีถูกระงับ'

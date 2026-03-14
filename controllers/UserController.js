@@ -1,6 +1,65 @@
 const UserModel = require("../models/UsersModel");
 const PositionModel = require("../models/PositionModel");
+const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
+
+const resolvePositionId = async (emp_position) => {
+  if (!emp_position) return undefined;
+  if (mongoose.Types.ObjectId.isValid(emp_position)) return emp_position;
+
+  const existingPosition = await PositionModel.findOne({
+    position_name: emp_position,
+    deletedAt: null,
+  });
+
+  if (existingPosition) return existingPosition._id;
+
+  const createdPosition = await PositionModel.create({
+    position_name: emp_position,
+  });
+
+  return createdPosition._id;
+};
+
+const isActiveEmployee = (employee) =>
+  employee && employee.role === "Employee" && employee.is_active && !employee.softDelete;
+
+const isSoftDeletedEmployee = (employee) =>
+  employee && employee.role === "Employee" && employee.softDelete;
+
+const buildEmployeeId = async () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+
+  const yearPrefix = `emp${year}`;
+  const count = await UserModel.countDocuments({
+    emp_id: { $regex: `^${yearPrefix}` },
+  });
+
+  const sequence = String(count + 1).padStart(3, "0");
+  return `${yearPrefix}${month}${day}${sequence}`;
+};
+
+const applyEmploymentTypeForCreate = (
+  userData,
+  employment_type,
+  emp_salary,
+  part_time_hours,
+) => {
+  if (employment_type === "Full-time") {
+    if (!emp_salary) return "กรุณากรอกเงินเดือน";
+    userData.emp_salary = Number(emp_salary);
+  }
+
+  if (employment_type === "Part-time") {
+    if (!part_time_hours) return "กรุณากรอกชั่วโมงทำงาน";
+    userData.part_time_hours = Number(part_time_hours);
+  }
+
+  return null;
+};
 
 // @desc    สร้างผู้ใช้ใหม่ (Employee หรือ Customer) โดย Admin
 // @route   POST /api/auth/admin/create-user
@@ -8,25 +67,25 @@ const bcrypt = require("bcryptjs");
 exports.createEmployee = async (req, res) => {
   try {
     const {
-      userFullname,
+      user_fullname,
       email,
       password,
-      authProvider = "local",
-      userPhone,
-      userBirthdate,
+      auth_provider = "local",
+      user_phone,
+      user_birthdate,
       role,
-      isEmailVerified = true,
-      profileCompleted = true,
-      empPosition,
-      startWorkingDate,
-      employmentType,
-      empSalary,
-      partTimeHours,
-      empStatus = "Active",
+      is_email_verified = true,
+      profile_completed = true,
+      emp_position,
+      start_working_date,
+      employment_type,
+      emp_salary,
+      part_time_hours,
+      emp_status = "Active",
       softDelete = false,
     } = req.body;
 
-    if (!userFullname || !email || !password || !role) {
+    if (!user_fullname || !email || !password || !role) {
       return res.status(400).json({
         success: false,
         message: "กรุณากรอกข้อมูลให้ครบถ้วน",
@@ -48,85 +107,59 @@ exports.createEmployee = async (req, res) => {
       });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
-
     const userData = {
-      userFullname,
+      user_fullname,
       email,
-      password: hashedPassword,
-      authProvider,
-      userPhone,
+      password,
+      auth_provider,
+      user_phone,
       role,
-      isEmailVerified,
-      profileCompleted,
+      is_email_verified,
+      profile_completed,
       softDelete,
-      isActive: true,
+      is_active: true,
     };
 
-    if (userBirthdate) {
-      userData.userBirthdate = new Date(userBirthdate);
+    if (user_birthdate) {
+      userData.user_birthdate = new Date(user_birthdate);
     }
 
     if (req.file) {
-      userData.userImg = `/uploads/users/${req.file.filename}`;
+      userData.user_img = `/uploads/users/${req.file.filename}`;
     }
 
     if (role === "Employee") {
-      if (!empPosition || !startWorkingDate || !employmentType) {
+      if (!emp_position || !start_working_date || !employment_type) {
         return res.status(400).json({
           success: false,
           message: "กรุณากรอกข้อมูลพนักงานให้ครบถ้วน",
         });
       }
 
-      const now = new Date();
-      const year = now.getFullYear();
-      const month = String(now.getMonth() + 1).padStart(2, "0");
-      const day = String(now.getDate()).padStart(2, "0");
+      userData.emp_id = await buildEmployeeId();
 
-      const yearPrefix = `emp${year}`;
-      console.log("Year Prefix:", yearPrefix);
-
-      const count = await UserModel.countDocuments({
-        empId: { $regex: `^${yearPrefix}` },
-      });
-      console.log("Current employee count:", count);
-
-      const sequence = String(count + 1).padStart(3, "0");
-      const generatedEmpId = `${yearPrefix}${month}${day}${sequence}`;
-
-      console.log("Generated emp_id:", generatedEmpId);
-      userData.empId = generatedEmpId;
-
-      userData.empPosition = await resolvePositionId(empPosition);
-      userData.startWorkingDate = new Date(startWorkingDate);
-      userData.employmentType = employmentType;
-      userData.empStatus = empStatus;
+      userData.emp_position = await resolvePositionId(emp_position);
+      userData.start_working_date = new Date(start_working_date);
+      userData.employment_type = employment_type;
+      userData.emp_status = emp_status;
 
       console.log("Employee data before create:", {
-        empId: userData.empId,
-        empPosition: userData.empPosition,
-        employmentType: userData.employmentType,
+        emp_id: userData.emp_id,
+        emp_position: userData.emp_position,
+        employment_type: userData.employment_type,
       });
 
-      if (employmentType === "Full-time") {
-        if (!empSalary) {
-          return res.status(400).json({
-            success: false,
-            message: "กรุณากรอกเงินเดือน",
-          });
-        }
-        userData.empSalary = Number(empSalary);
-      }
-
-      if (employmentType === "Part-time") {
-        if (!partTimeHours) {
-          return res.status(400).json({
-            success: false,
-            message: "กรุณากรอกชั่วโมงทำงาน",
-          });
-        }
-        userData.partTimeHours = Number(partTimeHours);
+      const employmentError = applyEmploymentTypeForCreate(
+        userData,
+        employment_type,
+        emp_salary,
+        part_time_hours,
+      );
+      if (employmentError) {
+        return res.status(400).json({
+          success: false,
+          message: employmentError,
+        });
       }
     }
 
@@ -134,7 +167,7 @@ exports.createEmployee = async (req, res) => {
     const newUser = await UserModel.create(userData);
     console.log("Created user:", {
       id: newUser._id,
-      empId: newUser.empId,
+      emp_id: newUser.emp_id,
       email: newUser.email,
       role: newUser.role,
     });
@@ -161,7 +194,7 @@ exports.createEmployee = async (req, res) => {
 // @access  Private (Admin only)
 exports.getEmployees = async (req, res, next) => {
   try {
-    console.log("=== GET /api/auth/admin/employees ===");
+    console.log("=== GET /auth/admin/employees ===");
     console.log("Fetching employees...");
 
     const employees = await UserModel.find({
@@ -173,7 +206,7 @@ exports.getEmployees = async (req, res, next) => {
       ],
     })
       .select("-password")
-      .populate("empPosition")
+      .populate("emp_position")
       .sort({ createdAt: -1 });
 
     console.log("Employees found:", employees.length);
@@ -224,12 +257,7 @@ exports.getEmployeeById = async (req, res, next) => {
     const employee = await UserModel.findById(req.params.id).select(
       "-password",
     );
-    if (
-      !employee ||
-      employee.role !== "Employee" ||
-      !employee.isActive ||
-      employee.softDelete
-    ) {
+    if (!isActiveEmployee(employee)) {
       return res.status(404).json({
         success: false,
         message: "ไม่พบพนักงาน",
@@ -251,49 +279,44 @@ exports.getEmployeeById = async (req, res, next) => {
 exports.updateEmployee = async (req, res, next) => {
   try {
     const employee = await UserModel.findById(req.params.id);
-    if (
-      !employee ||
-      employee.role !== "Employee" ||
-      !employee.isActive ||
-      employee.softDelete
-    ) {
+    if (!isActiveEmployee(employee)) {
       return res.status(404).json({
         success: false,
         message: "ไม่พบพนักงาน",
       });
     }
     const {
-      userFullname,
+      user_fullname,
       email,
-      userPhone,
-      userBirthdate,
-      empPosition,
-      startWorkinDate,
-      lastWorkingDate = null,
-      employmentType,
-      empSalary,
-      partTimeHours,
-      empStatus,
+      user_phone,
+      user_birthdate,
+      emp_position,
+      start_working_date,
+      last_working_date = null,
+      employment_type,
+      emp_salary,
+      part_time_hours,
+      emp_status,
     } = req.body;
     // อัพเดตข้อมูล
-    if (userFullname) employee.userFullname = userFullname;
+    if (user_fullname) employee.user_fullname = user_fullname;
     if (email) employee.email = email;
-    if (userPhone) employee.userPhone = userPhone;
-    if (userBirthdate) employee.userBirthdate = userBirthdate;
-    if (empPosition)
-      employee.empPosition = await resolvePositionId(empPosition);
-    if (startWorkinDate) employee.startWorkinDate = startWorkinDate;
-    if (lastWorkingDate !== undefined)
-      employee.lastWorkingDate = lastWorkingDate;
-    if (employmentType) employee.employmentType = employmentType;
-    if (empStatus) employee.empStatus = empStatus;
-    if (employmentType === "Full-time" && empSalary) {
-      employee.empSalary = empSalary;
-      employee.partTimeHours = undefined; // ล้างชั่วโมงทำงานถ้าเปลี่ยนเป็น Full-time
+    if (user_phone) employee.user_phone = user_phone;
+    if (user_birthdate) employee.user_birthdate = user_birthdate;
+    if (emp_position)
+      employee.emp_position = await resolvePositionId(emp_position);
+    if (start_working_date) employee.start_working_date = start_working_date;
+    if (last_working_date !== undefined)
+      employee.last_working_date = last_working_date;
+    if (employment_type) employee.employment_type = employment_type;
+    if (emp_status) employee.emp_status = emp_status;
+    if (employment_type === "Full-time" && emp_salary) {
+      employee.emp_salary = emp_salary;
+      employee.part_time_hours = undefined; // ล้างชั่วโมงทำงานถ้าเปลี่ยนเป็น Full-time
     }
-    if (employmentType === "Part-time" && partTimeHours) {
-      employee.partTimeHours = partTimeHours;
-      employee.empSalary = undefined; // ล้างเงินเดือนถ้าเปลี่ยนเป็น Part-time
+    if (employment_type === "Part-time" && part_time_hours) {
+      employee.part_time_hours = part_time_hours;
+      employee.emp_salary = undefined; // ล้างเงินเดือนถ้าเปลี่ยนเป็น Part-time
     }
     // บันทึกการเปลี่ยนแปลง
     await employee.save({ validateBeforeSave: false });
@@ -319,13 +342,13 @@ exports.softDeleteEmployee = async (req, res, next) => {
   try {
     const employee = await UserModel.findById(req.params.id);
 
-    if (!employee || employee.role !== "Employee" || employee.softDelete) {
+    if (!isActiveEmployee(employee)) {
       return res.status(404).json({ success: false, message: "ไม่พบพนักงาน" });
     }
 
     employee.softDelete = true;
-    employee.isActive = false; // อาจจะยังคงสถานะ active ไว้เพื่อให้สามารถกู้คืนได้ง่าย
-    employee.deletedAt = new Date();
+    employee.is_active = false; // อาจจะยังคงสถานะ active ไว้เพื่อให้สามารถกู้คืนได้ง่าย
+    employee.deleted_at = new Date();
 
     await employee.save({ validateBeforeSave: false });
 
@@ -345,7 +368,7 @@ exports.softDeleteEmployee = async (req, res, next) => {
 exports.hardDeletedEmployee = async (req, res, next) => {
   try {
     const employee = await UserModel.findById(req.params.id);
-    if (!employee || employee.role !== "Employee" || !employee.softDelete) {
+    if (!isSoftDeletedEmployee(employee)) {
       return res.status(404).json({
         success: false,
         message: "ไม่พบพนักงานที่ถูกลบ",
@@ -369,15 +392,15 @@ exports.hardDeletedEmployee = async (req, res, next) => {
 exports.restoreEmployee = async (req, res, next) => {
   try {
     const employee = await UserModel.findById(req.params.id);
-    if (!employee || employee.role !== "Employee" || !employee.softDelete) {
+    if (!isSoftDeletedEmployee(employee)) {
       return res.status(404).json({
         success: false,
         message: "ไม่พบพนักงานที่ถูกลบ",
       });
     }
     employee.softDelete = false;
-    employee.isActive = true;
-    employee.deletedAt = undefined;
+    employee.is_active = true;
+    employee.deleted_at = undefined;
     await employee.save({ validateBeforeSave: false });
 
     res.status(200).json({
