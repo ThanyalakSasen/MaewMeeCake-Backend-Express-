@@ -1,11 +1,11 @@
 // addressSchema.js
 const mongoose = require("mongoose");
-const usersModel = require("./usersModel");
+const usersModel = require("./UsersModel");
 const Schema = mongoose.Schema;
 
 const addressSchema = new Schema(
   {
-    users_id: {
+    user_id: {
       type: Schema.Types.ObjectId,
       ref: "Users",
       required: true,
@@ -15,26 +15,13 @@ const addressSchema = new Schema(
       enum: ["home", "office", "other"],
       default: "home",
     },
-
     address_line: { type: String, required: true }, // บ้านเลขที่ หมู่ ซอย ถนน
-
-    // เก็บ reference ไปที่ Geography document (ระดับ subdistrict)
-    // 1 document ของ Geography มีข้อมูลครบทั้ง จังหวัด/อำเภอ/ตำบล
-    geography_id: {
-      type: Schema.Types.ObjectId,
-      ref: "Geography",
-      required: true,
-    },
-
-    // snapshot ไว้แสดงผลโดยไม่ต้อง populate ทุกครั้ง
-    postal_code: { type: Number, required: true },
-    subdistrict_name: { type: String, required: true },
-    district_name: { type: String, required: true },
-    province_name: { type: String, required: true },
-
-    is_default: { type: Boolean, default: false },
+    sub_district: { type: String, required: true }, // ตำบล
+    district: { type: String, required: true }, // อำเภอ
+    province: { type: String, required: true }, // จังหวัด
+    postal_code: { type: String, required: true }, // รหัสไปรษณีย์
   },
-  { _id: true }
+  { timestamps: true }
 );
 
-module.exports = addressSchema;
+module.exports = mongoose.model("Address", addressSchema);

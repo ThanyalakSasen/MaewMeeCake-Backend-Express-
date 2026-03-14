@@ -8,7 +8,6 @@ const PORT = process.env.PORT || 5000;
 connectDB();
 
 // after mongoose.connect(...) and connection established
-require('./seeders/seedGeography');
 
 app.use((err, req, res, next) => {
   console.error(err);

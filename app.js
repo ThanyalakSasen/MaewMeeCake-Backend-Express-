@@ -12,7 +12,7 @@ const connectDB = require("./config/db");
 // ===== init =====
 connectDB();
 require("./config/passport");
-require("./models/usersModel");
+require("./models/UsersModel");
 require("./models/PositionModel");
 
 const authRoutes = require("./routes/AuthRoutes");
