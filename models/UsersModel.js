@@ -26,7 +26,7 @@ const userSchema = new Schema({
     default: null
   },
 
-  authProvider: {
+  auth_provider: {
     type: String,
     enum: ['local', 'google'],
     required: true
@@ -40,47 +40,43 @@ const userSchema = new Schema({
 
   user_birthdate: Date,
 
-  userPhone: {
+  user_phone: {
   type: String,
   required: false // เปลี่ยนเป็น false เพื่อรองรับ Google Login
 },
 
-  userImg: {
+  user_img: {
     type: String,
     default: null
   },
 
-  userAllergies: {
+  user_allergies: {
     type: [String],
     default: []
   },
 
-  emailVerifyToken: {
+  email_verify_token: {
     type: String,
     default: null
   },
 
-  isEmailVerified: {
+  is_email_verified: {
     type: Boolean,
     default: false
   },
-  profileCompleted: {
+  profile_completed: {
   type: Boolean,
   default: false
   },
-  address: {
-    type: String,
-    default: null
-  },
 
   // ===== Employee only =====
-  empId: {
+  emp_id: {
     type: String,
     unique: true,
     sparse: true
   },
 
-  empPosition: {
+  emp_position: {
     type: Schema.Types.ObjectId,
     ref: 'Position',
     required: function () {
@@ -88,19 +84,19 @@ const userSchema = new Schema({
     }
   },
 
-  startWorkingDate: {
+  start_working_date: {
     type: Date,
     required: function () {
       return this.role === 'Employee'
     }
   },
 
-  lastWorkingDate: {
+  last_working_date: {
     type: Date,
     default: null
   },
 
-  employmentType: {
+  employment_type: {
     type: String,
     enum: ['Full-time', 'Part-time', 'Contract', 'Internship'],
     required: function () {
@@ -108,21 +104,21 @@ const userSchema = new Schema({
     }
   },
 
-  empSalary: {
+  emp_salary: {
     type: Number,
     required: function () {
       return this.role === 'Employee' && this.employment_type === 'Full-time'
     }
   },
 
-  partTimeHours: {
+  part_time_hours: {
     type: Number,
     required: function () {
       return this.role === 'Employee' && this.employment_type === 'Part-time'
     }
   },
 
-  empStatus: {
+  emp_status: {
     type: String,
     enum: ['Active', 'Inactive'],
     default: 'Active'
@@ -133,26 +129,26 @@ const userSchema = new Schema({
     default: false
   },
   
-  isActive: {
+  is_active: {
     type: Boolean,
     default: true
   },
 
-  resetPasswordToken: {
+  reset_password_token: {
     type: String,
     default: null
   },
   
-  resetPasswordTokenExpiry: {
+  reset_password_token_expiry: {
     type: Date,
     default: null
   },
  
-  verificationTokenExpiry: {
+  verification_token_expiry: {
     type: Date,
     default: null},
 
-  deletedAt: {
+  deleted_at: {
     type: Date,
     default: null
   }
@@ -181,14 +177,13 @@ userSchema.methods.matchPassword = async function(enteredPassword) {
 // 3. ส่วนสร้าง Verification Token (สำหรับการยืนยันอีเมล)
 userSchema.methods.createVerificationToken = function() {
   const token = crypto.randomBytes(32).toString('hex');
-  
-  // *** สำคัญ: ต้องเป็น emailVerifyToken ให้ตรงกับ Schema และ Controller ***
-  this.emailVerifyToken = crypto
+
+  this.email_verify_token = crypto
     .createHash('sha256')
     .update(token)
     .digest('hex');
-  
-  this.verificationTokenExpiry = Date.now() + 24 * 60 * 60 * 1000; 
+
+  this.verification_token_expiry = Date.now() + 24 * 60 * 60 * 1000;
   
   return token;
 };
@@ -197,12 +192,12 @@ userSchema.methods.createVerificationToken = function() {
 userSchema.methods.createResetPasswordToken = function () {
   const token = crypto.randomBytes(32).toString("hex");
 
-  this.resetPasswordToken = crypto
+  this.reset_password_token = crypto
     .createHash("sha256")
     .update(token)
     .digest("hex");
 
-  this.resetPasswordTokenExpiry = Date.now() + 60 * 60 * 1000; // 1 ชม.
+  this.reset_password_token_expiry = Date.now() + 60 * 60 * 1000;
 
   return token;
 };
