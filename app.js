@@ -7,13 +7,15 @@ const session = require("express-session");
 const passport = require("./config/passport");
 
 const helmet = require("helmet");
-const connectDB = require("./config/db");
 
 // ===== init =====
 connectDB();
 require("./config/passport");
 require("./models/UsersModel");
 require("./models/PositionModel");
+require("./models/UnitModel");
+require("./models/IngredientModel");
+require("./models/IngredientCategoryModel");
 
 const authRoutes = require("./routes/AuthRoutes");
 const addressRoutes = require("./routes/AddressRoute");

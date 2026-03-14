@@ -1,5 +1,5 @@
-const Ingredient = require("../models/ingredientModel");
-const IngredientCategory = require("../models/ingredientcategoryModel");
+const Ingredient = require("../models/IngredientModel");
+const IngredientCategory = require("../models/IngredientCategoryModel");
 
 exports.createIngredient = async (req, res, next) => {
   try {
@@ -24,7 +24,7 @@ exports.createIngredientCategory = async (req, res, next) => {
 exports.getAllIngredient = async (req, res, next) => {
   try {
     const ingredients = await Ingredient.find({ softDeleted: false })
-      .populate("category_id", "category_name ")
+      .populate("ingredientcategory_id", "ingredientcategory_name")
       .populate("unit_id", "unit_name unit_symbol unit_type");
 
     res.status(200).json(ingredients); 
@@ -45,7 +45,7 @@ exports.getAllIngredientCategory = async (req, res, next) => {
 exports.getIngredientById = async (req, res) => {
   try {
     const ingredient = await Ingredient.findById(req.params.id)
-      .populate("category_id", "category_name")
+      .populate("ingredientcategory_id", "ingredientcategory_name")
       .populate("unit_id", "unit_name unit_symbol unit_type");
 
     if (!ingredient)

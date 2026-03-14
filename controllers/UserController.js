@@ -1,23 +1,64 @@
 const UserModel = require("../models/UsersModel");
 const PositionModel = require("../models/PositionModel");
 const mongoose = require("mongoose");
+const bcrypt = require("bcryptjs");
 
-const resolvePositionId = async (empPosition) => {
-  if (!empPosition) return undefined;
-  if (mongoose.Types.ObjectId.isValid(empPosition)) return empPosition;
+const resolvePositionId = async (emp_position) => {
+  if (!emp_position) return undefined;
+  if (mongoose.Types.ObjectId.isValid(emp_position)) return emp_position;
 
   const existingPosition = await PositionModel.findOne({
-    position_name: empPosition,
+    position_name: emp_position,
     deletedAt: null,
   });
 
   if (existingPosition) return existingPosition._id;
 
   const createdPosition = await PositionModel.create({
-    position_name: empPosition,
+    position_name: emp_position,
   });
 
   return createdPosition._id;
+};
+
+const isActiveEmployee = (employee) =>
+  employee && employee.role === "Employee" && employee.is_active && !employee.softDelete;
+
+const isSoftDeletedEmployee = (employee) =>
+  employee && employee.role === "Employee" && employee.softDelete;
+
+const buildEmployeeId = async () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+
+  const yearPrefix = `emp${year}`;
+  const count = await UserModel.countDocuments({
+    emp_id: { $regex: `^${yearPrefix}` },
+  });
+
+  const sequence = String(count + 1).padStart(3, "0");
+  return `${yearPrefix}${month}${day}${sequence}`;
+};
+
+const applyEmploymentTypeForCreate = (
+  userData,
+  employment_type,
+  emp_salary,
+  part_time_hours,
+) => {
+  if (employment_type === "Full-time") {
+    if (!emp_salary) return "กรุณากรอกเงินเดือน";
+    userData.emp_salary = Number(emp_salary);
+  }
+
+  if (employment_type === "Part-time") {
+    if (!part_time_hours) return "กรุณากรอกชั่วโมงทำงาน";
+    userData.part_time_hours = Number(part_time_hours);
+  }
+
+  return null;
 };
 
 // @desc    สร้างผู้ใช้ใหม่ (Employee หรือ Customer) โดย Admin
@@ -91,10 +132,10 @@ exports.createEmployee = async (req, res) => {
       authProvider,
       userPhone: normalizedPhone,
       role,
-      isEmailVerified,
-      profileCompleted,
+      is_email_verified,
+      profile_completed,
       softDelete,
-      isActive: true,
+      is_active: true,
     };
 
     if (normalizedBirthdate) {
@@ -102,7 +143,7 @@ exports.createEmployee = async (req, res) => {
     }
 
     if (req.file) {
-      userData.userImg = `/uploads/users/${req.file.filename}`;
+      userData.user_img = `/uploads/users/${req.file.filename}`;
     }
 
     if (role === "Employee") {
@@ -117,10 +158,7 @@ exports.createEmployee = async (req, res) => {
         });
       }
 
-      const now = new Date();
-      const year = now.getFullYear();
-      const month = String(now.getMonth() + 1).padStart(2, "0");
-      const day = String(now.getDate()).padStart(2, "0");
+      userData.emp_id = await buildEmployeeId();
 
       const yearPrefix = `emp${year}`;
       console.log("Year Prefix:", yearPrefix);
@@ -142,9 +180,9 @@ exports.createEmployee = async (req, res) => {
       userData.empStatus = normalizedEmpStatus;
 
       console.log("Employee data before create:", {
-        empId: userData.empId,
-        empPosition: userData.empPosition,
-        employmentType: userData.employmentType,
+        emp_id: userData.emp_id,
+        emp_position: userData.emp_position,
+        employment_type: userData.employment_type,
       });
 
       if (normalizedEmploymentType === "Full-time") {
@@ -172,7 +210,7 @@ exports.createEmployee = async (req, res) => {
     const newUser = await UserModel.create(userData);
     console.log("Created user:", {
       id: newUser._id,
-      empId: newUser.empId,
+      emp_id: newUser.emp_id,
       email: newUser.email,
       role: newUser.role,
     });
@@ -211,7 +249,7 @@ exports.createEmployee = async (req, res) => {
 // @access  Private (Admin only)
 exports.getEmployees = async (req, res, next) => {
   try {
-    console.log("=== GET /api/auth/admin/employees ===");
+    console.log("=== GET /auth/admin/employees ===");
     console.log("Fetching employees...");
 
     const employees = await UserModel.find({
@@ -223,7 +261,7 @@ exports.getEmployees = async (req, res, next) => {
       ],
     })
       .select("-password")
-      .populate("empPosition")
+      .populate("emp_position")
       .sort({ createdAt: -1 });
 
     console.log("Employees found:", employees.length);
@@ -274,12 +312,7 @@ exports.getEmployeeById = async (req, res, next) => {
     const employee = await UserModel.findById(req.params.id).select(
       "-password",
     );
-    if (
-      !employee ||
-      employee.role !== "Employee" ||
-      !employee.isActive ||
-      employee.softDelete
-    ) {
+    if (!isActiveEmployee(employee)) {
       return res.status(404).json({
         success: false,
         message: "ไม่พบพนักงาน",
@@ -301,12 +334,7 @@ exports.getEmployeeById = async (req, res, next) => {
 exports.updateEmployee = async (req, res, next) => {
   try {
     const employee = await UserModel.findById(req.params.id);
-    if (
-      !employee ||
-      employee.role !== "Employee" ||
-      !employee.isActive ||
-      employee.softDelete
-    ) {
+    if (!isActiveEmployee(employee)) {
       return res.status(404).json({
         success: false,
         message: "ไม่พบพนักงาน",
@@ -389,13 +417,13 @@ exports.softDeleteEmployee = async (req, res, next) => {
   try {
     const employee = await UserModel.findById(req.params.id);
 
-    if (!employee || employee.role !== "Employee" || employee.softDelete) {
+    if (!isActiveEmployee(employee)) {
       return res.status(404).json({ success: false, message: "ไม่พบพนักงาน" });
     }
 
     employee.softDelete = true;
-    employee.isActive = false; // อาจจะยังคงสถานะ active ไว้เพื่อให้สามารถกู้คืนได้ง่าย
-    employee.deletedAt = new Date();
+    employee.is_active = false; // อาจจะยังคงสถานะ active ไว้เพื่อให้สามารถกู้คืนได้ง่าย
+    employee.deleted_at = new Date();
 
     await employee.save({ validateBeforeSave: false });
 
@@ -415,7 +443,7 @@ exports.softDeleteEmployee = async (req, res, next) => {
 exports.hardDeletedEmployee = async (req, res, next) => {
   try {
     const employee = await UserModel.findById(req.params.id);
-    if (!employee || employee.role !== "Employee" || !employee.softDelete) {
+    if (!isSoftDeletedEmployee(employee)) {
       return res.status(404).json({
         success: false,
         message: "ไม่พบพนักงานที่ถูกลบ",
@@ -439,15 +467,15 @@ exports.hardDeletedEmployee = async (req, res, next) => {
 exports.restoreEmployee = async (req, res, next) => {
   try {
     const employee = await UserModel.findById(req.params.id);
-    if (!employee || employee.role !== "Employee" || !employee.softDelete) {
+    if (!isSoftDeletedEmployee(employee)) {
       return res.status(404).json({
         success: false,
         message: "ไม่พบพนักงานที่ถูกลบ",
       });
     }
     employee.softDelete = false;
-    employee.isActive = true;
-    employee.deletedAt = undefined;
+    employee.is_active = true;
+    employee.deleted_at = undefined;
     await employee.save({ validateBeforeSave: false });
 
     res.status(200).json({

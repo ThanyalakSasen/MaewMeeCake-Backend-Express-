@@ -1,11 +1,4 @@
 const app = require("./app");
-const connectDB = require("./config/db");
-
-// Port
-const PORT = process.env.PORT || 5000;
-
-// Connect MongoDB
-connectDB();
 
 // after mongoose.connect(...) and connection established
 
