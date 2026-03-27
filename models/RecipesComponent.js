@@ -101,11 +101,6 @@ const RecipeComponentSchema = new Schema(
       default: null,
     },
 
-    // เวลาที่ใช้โดยประมาณ
-    total_time_minutes: {
-      type: Number,
-      default: null,
-    },
 
     softDelete: {
       type: Boolean,
