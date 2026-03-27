@@ -98,7 +98,7 @@ const userSchema = new Schema({
 
   employment_type: {
     type: String,
-    enum: ['Full-time', 'Part-time', 'Contract', 'Internship'],
+    enum: ['Full-time', 'Part-time'],
     required: function () {
       return this.role === 'Employee'
     }

@@ -326,9 +326,10 @@ exports.login = async (req, res, next) => {
   
   try {
     const { email, password } = req.body;
+    const normalizedEmail = email ? email.trim().toLowerCase() : "";
     
     
-    if (!email || !password) {
+    if (!normalizedEmail || !password) {
       return res.status(400).json({
         success: false,
         message: 'กรุณากรอกอีเมลและรหัสผ่าน'
@@ -336,11 +337,11 @@ exports.login = async (req, res, next) => {
     }
     
     // หา user และดึง password มาด้วย
-    const user = await UserModel.findOne({ 
-  email: email.toLowerCase(),
-  softDelete: false, 
-      is_active: true 
-}).select('+password');
+    const user = await UserModel.findOne({
+      email: normalizedEmail,
+      softDelete: { $ne: true }, //$ne ย่อมาจาก not equal ใน MongoDB
+      is_active: { $ne: false } //ใช้เพื่อบอกว่า “ค่าต้องไม่เท่ากับที่กำหนด”
+    }).select('+password');
     
     if (!user) {
       console.log("Login Debug: User not found for email:", email);
@@ -353,7 +354,8 @@ exports.login = async (req, res, next) => {
     console.log("Login Debug: User found, hashing comparison starts...");
     
     // ตรวจสอบว่าเป็น local account หรือไม่
-    if (user.auth_provider !== 'local' || !user.password) {
+    const authProvider = user.auth_provider || (user.password ? 'local' : 'google');
+    if (authProvider !== 'local' || !user.password) {
       return res.status(401).json({
         success: false,
         message: 'บัญชีนี้ลงทะเบียนผ่าน Google กรุณาใช้ Sign in with Google'
