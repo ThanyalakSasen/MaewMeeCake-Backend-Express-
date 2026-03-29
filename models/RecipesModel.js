@@ -111,6 +111,18 @@ const recipesSchema = new Schema(
       default: null, // หน่วยของ yield เช่น ชิ้น, โหล, กก.
     },
 
+    // เวลารวมโดยประมาณ (นาที)
+    total_time_minutes: {
+      type: Number,
+      default: null,
+    },
+
+    // ประเภทสูตร
+    typerecipes: {
+      type: Schema.Types.ObjectId,
+      ref: "typerecipes",
+      required: true,
+    },
 
     // หมวดหมู่
     productcategories: {
@@ -169,6 +181,10 @@ const recipesSchema = new Schema(
       type: String,
       enum: ["draft", "published", "archived"],
       default: "draft",
+    },
+    isDeleted: {
+      type: Boolean,
+      default: false,
     },
   },
   { timestamps: true },
