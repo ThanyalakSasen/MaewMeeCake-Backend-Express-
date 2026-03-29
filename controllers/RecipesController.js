@@ -2,6 +2,23 @@ const Recipe = require("../models/RecipesModel");
 const Product = require("../models/ProductModel");
 const TypeRecipe = require("../models/TypeRecipesModel");
 
+exports.checkRecipeName = async (req, res) => {
+  try {
+    const { name } = req.query;
+
+    if (!name) return res.status(400).json({ message: "โปรดระบุชื่อสูตร" });
+
+    const existingRecipe = await Recipe.findOne({
+      recipe_name: name.trim(),
+      softDelete: false
+    }).collation({ locale: "en", strength: 2 });
+
+    res.json({ exists: !!existingRecipe });
+  } catch (err) {
+    res.status(500).json({ message: "Server Error", error: err.message });
+  }
+};
+
 exports.createRecipe = async (req, res) => {
   try {
     const {
@@ -19,6 +36,16 @@ exports.createRecipe = async (req, res) => {
 
     if (!recipe_name || String(recipe_name).trim() === "") {
       return res.status(400).json({ message: "กรุณาระบุชื่อสูตร" });
+    }
+
+    // Check for duplicate recipe name
+    const existingRecipe = await Recipe.findOne({
+      recipe_name: String(recipe_name).trim(),
+      softDelete: false
+    }).collation({ locale: "en", strength: 2 });
+
+    if (existingRecipe) {
+      return res.status(400).json({ message: "ชื่อสูตรนี้มีอยู่แล้ว กรุณาใช้ชื่ออื่น" });
     }
 
     let resolvedProductCategory = productcategories;

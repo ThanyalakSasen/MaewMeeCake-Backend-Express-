@@ -7,6 +7,7 @@ const session = require("express-session");
 const passport = require("./config/passport");
 const helmet = require("helmet");
 const path = require("path"); 
+const connectDB = require('./config/db');
 
 // ===== init =====
 connectDB();

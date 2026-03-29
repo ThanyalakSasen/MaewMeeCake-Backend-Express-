@@ -1,5 +1,5 @@
 const app = require("./app");
-
+const PORT = process.env.PORT;
 // after mongoose.connect(...) and connection established
 
 app.use((err, req, res, next) => {

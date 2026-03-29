@@ -10,6 +10,7 @@ router.get('/getAllRecipeComponents', protect, recipeComponentController.getAllR
 router.get('/getRecipeComponentById/:id', protect, recipeComponentController.getRecipeById);
 //เฉพาะเจ้าของร้านเท่านั้นที่สามารถสร้าง แก้ไข และลบสูตรอาหารได้
 
+router.get('/checkRecipeName', protect, recipesController.checkRecipeName);
 router.post('/createRecipe', protect, recipesController.createRecipe);
 router.put('/updateRecipe/:id', protect, recipesController.updateRecipe);
 router.delete('/softDeleteRecipe/:id', protect, recipesController.softDeleteRecipe);

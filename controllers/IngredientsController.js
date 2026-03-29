@@ -3,11 +3,29 @@ const IngredientCategory = require("../models/IngredientCategoryModel");
 
 exports.createIngredient = async (req, res, next) => {
   try {
-    const ingredient = await Ingredient.create(req.body);
+    const { ingredient_name } = req.body;
+    if (!ingredient_name || !ingredient_name.trim()) {
+      return res.status(400).json({ message: "กรุณาระบุชื่อวัตถุดิบ" });
+    }
+
+    const existingIngredient = await Ingredient.findOne({
+      ingredient_name: ingredient_name.trim(),
+    }).collation({ locale: "en", strength: 2 });
+
+    if (existingIngredient) {
+      return res
+        .status(409)
+        .json({ message: "ชื่อนี้มีวัตถุดิบอยู่แล้วในระบบ" });
+    }
+
+    const ingredient = await Ingredient.create({
+      ...req.body,
+      ingredient_name: ingredient_name.trim(),
+    });
     res.status(201).json(ingredient);
   } catch (err) {
     console.error(err);
-    next(err); 
+    next(err);
   }
 };
 
@@ -95,9 +113,10 @@ exports.updateIngredientCategory = async (req, res, next) => {
 
 exports.softDeleteIngredient = async (req, res, next) => {
   try {
-    const ingredient = await Ingredient.findByIdAndUpdate(req.params.id,
+    const ingredient = await Ingredient.findByIdAndUpdate(
+      req.params.id,
       { softDeleted: true },
-      { new: true }
+      { new: true },
     );
 
     if (!ingredient)
@@ -108,6 +127,20 @@ exports.softDeleteIngredient = async (req, res, next) => {
     next(err);
   }
 };
+
+exports.hardDeleteIngredient = async (req, res, next) => {
+  try {
+    const ingredient = await Ingredient.findByIdAndDelete(req.params.id);
+
+    if (!ingredient)
+      return res.status(404).json({ message: "Ingredient not found" });
+
+    res.json({ message: "Ingredient deleted permanently" });
+  } catch (err) {
+    next(err);
+  }
+};
+
 exports.softDeleteIngredientCategory = async (req, res, next) => {
   try {
     const category = await IngredientCategory.findByIdAndUpdate(req.params.id,

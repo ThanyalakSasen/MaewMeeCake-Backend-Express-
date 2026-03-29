@@ -18,6 +18,7 @@ router.put('/restore/:id', protect, ingredientController.restoreIngredient);
 router.put('/categories/:id', protect, ingredientController.updateIngredientCategory);
 
 router.delete('/softDeleteIngredient/:id', protect, ingredientController.softDeleteIngredient);
+router.delete('/deleteIngredient/:id', protect, ingredientController.hardDeleteIngredient);
 router.delete('/categories/:id/soft-delete', protect, ingredientController.softDeleteIngredientCategory);
 
 exports = module.exports = router;

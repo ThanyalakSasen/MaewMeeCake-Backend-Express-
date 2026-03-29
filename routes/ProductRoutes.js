@@ -5,25 +5,6 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { protect } = require('../middlewares/authMiddleware');
-const multer = require('multer');
-const path = require('path');
-
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, 'uploads/products/');
-  },
-  filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, uniqueSuffix + path.extname(file.originalname));
-  }
-});
-const upload = multer({ storage: storage });
-
-const productUploadDir = path.join(process.cwd(), 'uploads', 'products');
-
-if (!fs.existsSync(productUploadDir)) {
-	fs.mkdirSync(productUploadDir, { recursive: true });
-}
 
 const storage = multer.diskStorage({
 	destination: (req, file, cb) => {
