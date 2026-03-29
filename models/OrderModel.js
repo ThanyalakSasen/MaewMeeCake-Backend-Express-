@@ -139,7 +139,7 @@ const orderSchema = new Schema(
     },
 
     // สถานะออเดอร์
-    status: {
+    status_order: {
       type: String,
       enum: [
         "pending",      // รอยืนยัน

@@ -10,11 +10,6 @@ const addressSchema = new Schema(
       ref: "Users",
       required: true,
     },
-    label: {
-      type: String,
-      enum: ["home", "office", "other"],
-      default: "home",
-    },
     address_line: { type: String, required: true }, // บ้านเลขที่ หมู่ ซอย ถนน
     sub_district: { type: String, required: true }, // ตำบล
     district: { type: String, required: true }, // อำเภอ
