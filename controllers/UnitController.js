@@ -1,5 +1,5 @@
-const Unit = require("../models/unitModel");
-const UnitType = require("../models/unittypeModel");
+const Unit = require("../models/UnitModel");
+const UnitType = require("../models/UnitTypeModel");
 
 // ---จัดการประเภทหน่วย (UnitType)---
 exports.getAllUnitTypes = async (req, res) => {

@@ -98,6 +98,12 @@ exports.createProduct = async (req, res) => {
         .status(400)
         .json({ message: "ราคาสินค้าต้องไม่เป็นค่าลบ" });
     }
+
+    const existingProduct = await productModel.findOne({ product_name_th });
+    if (existingProduct) {
+      return res.status(409).json({ message: `มีสินค้าชื่อ "${product_name_th}" อยู่ในระบบแล้ว กรุณาใช้ชื่ออื่น` });
+    }
+
     const newProduct = new productModel({
       product_name_th,
       product_name_eng,
@@ -133,6 +139,19 @@ exports.getAllProducts = async (req, res) => {
       .populate("productcategories");
 
     res.status(200).json(products.map(normalizeProductResponse));
+  } catch (error) {
+    res.status(500).json({ message: "Server Error", error });
+  }
+};
+
+// Get all soft-deleted products
+exports.getDeletedProducts = async (req, res) => {
+  try {
+    const products = await productModel
+      .find({ softDelete: true })
+      .populate("recipe_id");
+
+    res.status(200).json(products);
   } catch (error) {
     res.status(500).json({ message: "Server Error", error });
   }
@@ -223,7 +242,8 @@ exports.updateProductById = async (req, res) => {
 
     res.status(200).json(normalizeProductResponse(populatedProduct));
   } catch (error) {
-    res.status(500).json({ message: "Server Error", error });
+    console.error("updateProductById error:", error);
+    res.status(500).json({ message: "Server Error", error: error.message });
   }
 };
 // Soft delete a product by ID

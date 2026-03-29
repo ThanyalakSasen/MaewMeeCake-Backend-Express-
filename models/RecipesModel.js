@@ -120,7 +120,7 @@ const recipesSchema = new Schema(
     // ประเภทสูตร
     typerecipes: {
       type: Schema.Types.ObjectId,
-      ref: "TypeRecipe",
+      ref: "typerecipes",
       required: true,
     },
 
@@ -181,6 +181,10 @@ const recipesSchema = new Schema(
       type: String,
       enum: ["draft", "published", "archived"],
       default: "draft",
+    },
+    isDeleted: {
+      type: Boolean,
+      default: false,
     },
   },
   { timestamps: true },
