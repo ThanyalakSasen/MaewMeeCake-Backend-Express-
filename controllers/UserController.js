@@ -68,24 +68,42 @@ exports.createEmployee = async (req, res) => {
   try {
     const {
       user_fullname,
+      userFullname,
       email,
       password,
-      auth_provider = "local",
+      authProvider = "local",
+      userPhone,
       user_phone,
       user_birthdate,
+      userBirthdate,
       role,
-      is_email_verified = true,
-      profile_completed = true,
+      isEmailVerified = true,
+      profileCompleted = true,
+      empPosition,
       emp_position,
+      startWorkingDate,
       start_working_date,
+      employmentType,
       employment_type,
+      empSalary,
       emp_salary,
-      part_time_hours,
-      emp_status = "Active",
+      partTimeHours,
+      empStatus = "Active",
+      emp_status,
       softDelete = false,
     } = req.body;
 
-    if (!user_fullname || !email || !password || !role) {
+    const normalizedFullname = user_fullname || userFullname;
+    const normalizedPhone = userPhone || user_phone;
+    const normalizedBirthdate = user_birthdate || userBirthdate;
+    const normalizedPosition = empPosition || emp_position;
+    const normalizedStartWorkingDate = startWorkingDate || start_working_date;
+    const normalizedEmploymentType = employmentType || employment_type;
+    const normalizedSalary =
+      empSalary !== undefined && empSalary !== null ? empSalary : emp_salary;
+    const normalizedEmpStatus = empStatus || emp_status;
+
+    if (!normalizedFullname || !email || !password || !role) {
       return res.status(400).json({
         success: false,
         message: "กรุณากรอกข้อมูลให้ครบถ้วน",
@@ -108,11 +126,11 @@ exports.createEmployee = async (req, res) => {
     }
 
     const userData = {
-      user_fullname,
+      user_fullname: normalizedFullname,
       email,
       password,
-      auth_provider,
-      user_phone,
+      authProvider,
+      userPhone: normalizedPhone,
       role,
       is_email_verified,
       profile_completed,
@@ -120,8 +138,8 @@ exports.createEmployee = async (req, res) => {
       is_active: true,
     };
 
-    if (user_birthdate) {
-      userData.user_birthdate = new Date(user_birthdate);
+    if (normalizedBirthdate) {
+      userData.user_birthdate = new Date(normalizedBirthdate);
     }
 
     if (req.file) {
@@ -129,7 +147,11 @@ exports.createEmployee = async (req, res) => {
     }
 
     if (role === "Employee") {
-      if (!emp_position || !start_working_date || !employment_type) {
+      if (
+        !normalizedPosition ||
+        !normalizedStartWorkingDate ||
+        !normalizedEmploymentType
+      ) {
         return res.status(400).json({
           success: false,
           message: "กรุณากรอกข้อมูลพนักงานให้ครบถ้วน",
@@ -138,10 +160,24 @@ exports.createEmployee = async (req, res) => {
 
       userData.emp_id = await buildEmployeeId();
 
-      userData.emp_position = await resolvePositionId(emp_position);
-      userData.start_working_date = new Date(start_working_date);
-      userData.employment_type = employment_type;
-      userData.emp_status = emp_status;
+      const yearPrefix = `emp${year}`;
+      console.log("Year Prefix:", yearPrefix);
+
+      const count = await UserModel.countDocuments({
+        empId: { $regex: `^${yearPrefix}` },
+      });
+      console.log("Current employee count:", count);
+
+      const sequence = String(count + 1).padStart(3, "0");
+      const generatedEmpId = `${yearPrefix}${month}${day}${sequence}`;
+
+      console.log("Generated emp_id:", generatedEmpId);
+      userData.empId = generatedEmpId;
+
+      userData.empPosition = await resolvePositionId(normalizedPosition);
+      userData.startWorkingDate = new Date(normalizedStartWorkingDate);
+      userData.employmentType = normalizedEmploymentType;
+      userData.empStatus = normalizedEmpStatus;
 
       console.log("Employee data before create:", {
         emp_id: userData.emp_id,
@@ -149,17 +185,24 @@ exports.createEmployee = async (req, res) => {
         employment_type: userData.employment_type,
       });
 
-      const employmentError = applyEmploymentTypeForCreate(
-        userData,
-        employment_type,
-        emp_salary,
-        part_time_hours,
-      );
-      if (employmentError) {
-        return res.status(400).json({
-          success: false,
-          message: employmentError,
-        });
+      if (normalizedEmploymentType === "Full-time") {
+        if (!normalizedSalary) {
+          return res.status(400).json({
+            success: false,
+            message: "กรุณากรอกเงินเดือน",
+          });
+        }
+        userData.empSalary = Number(normalizedSalary);
+      }
+
+      if (normalizedEmploymentType === "Part-time") {
+        if (!partTimeHours) {
+          return res.status(400).json({
+            success: false,
+            message: "กรุณากรอกชั่วโมงทำงาน",
+          });
+        }
+        userData.partTimeHours = Number(partTimeHours);
       }
     }
 
@@ -181,6 +224,18 @@ exports.createEmployee = async (req, res) => {
     console.error("Create Employee Error:", error);
     console.error("Error details:", error.message);
     console.error("Error stack:", error.stack);
+
+    if (
+      error?.name === "ValidationError" ||
+      error?.name === "CastError" ||
+      error?.code === 11000
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: error.message || "ข้อมูลไม่ถูกต้อง",
+      });
+    }
+
     return res.status(500).json({
       success: false,
       message: error.message || "เกิดข้อผิดพลาดในระบบ",
@@ -287,36 +342,56 @@ exports.updateEmployee = async (req, res, next) => {
     }
     const {
       user_fullname,
+      userFullname,
       email,
+      userPhone,
       user_phone,
       user_birthdate,
+      userBirthdate,
+      empPosition,
       emp_position,
-      start_working_date,
-      last_working_date = null,
+      startWorkingDate,
+      startWorkinDate,
+      lastWorkingDate = null,
+      employmentType,
       employment_type,
+      empSalary,
       emp_salary,
-      part_time_hours,
+      partTimeHours,
+      empStatus,
       emp_status,
     } = req.body;
+
+    const normalizedFullname = user_fullname || userFullname;
+    const normalizedPhone = userPhone || user_phone;
+    const normalizedBirthdate = user_birthdate || userBirthdate;
+    const normalizedPosition = empPosition || emp_position;
+    const normalizedStartWorkingDate = startWorkingDate || startWorkinDate;
+    const normalizedEmploymentType = employmentType || employment_type;
+    const normalizedEmpSalary =
+      empSalary !== undefined && empSalary !== null ? empSalary : emp_salary;
+    const normalizedEmpStatus = empStatus || emp_status;
+
     // อัพเดตข้อมูล
-    if (user_fullname) employee.user_fullname = user_fullname;
+    if (normalizedFullname) employee.user_fullname = normalizedFullname;
     if (email) employee.email = email;
-    if (user_phone) employee.user_phone = user_phone;
-    if (user_birthdate) employee.user_birthdate = user_birthdate;
-    if (emp_position)
-      employee.emp_position = await resolvePositionId(emp_position);
-    if (start_working_date) employee.start_working_date = start_working_date;
-    if (last_working_date !== undefined)
-      employee.last_working_date = last_working_date;
-    if (employment_type) employee.employment_type = employment_type;
-    if (emp_status) employee.emp_status = emp_status;
-    if (employment_type === "Full-time" && emp_salary) {
-      employee.emp_salary = emp_salary;
-      employee.part_time_hours = undefined; // ล้างชั่วโมงทำงานถ้าเปลี่ยนเป็น Full-time
+    if (normalizedPhone) employee.userPhone = normalizedPhone;
+    if (normalizedBirthdate) employee.user_birthdate = normalizedBirthdate;
+    if (normalizedPosition)
+      employee.empPosition = await resolvePositionId(normalizedPosition);
+    if (normalizedStartWorkingDate)
+      employee.startWorkingDate = normalizedStartWorkingDate;
+    if (lastWorkingDate !== undefined)
+      employee.lastWorkingDate = lastWorkingDate;
+    if (normalizedEmploymentType) employee.employmentType = normalizedEmploymentType;
+    if (normalizedEmpStatus) employee.empStatus = normalizedEmpStatus;
+    if (normalizedEmploymentType === "Full-time" && normalizedEmpSalary) {
+      employee.empSalary = normalizedEmpSalary;
+      employee.partTimeHours = undefined; // ล้างชั่วโมงทำงานถ้าเปลี่ยนเป็น Full-time
     }
-    if (employment_type === "Part-time" && part_time_hours) {
-      employee.part_time_hours = part_time_hours;
-      employee.emp_salary = undefined; // ล้างเงินเดือนถ้าเปลี่ยนเป็น Part-time
+    if (normalizedEmploymentType === "Part-time" && partTimeHours) {
+      employee.partTimeHours = partTimeHours;
+      employee.empSalary = undefined; // ล้างเงินเดือนถ้าเปลี่ยนเป็น Part-time
     }
     // บันทึกการเปลี่ยนแปลง
     await employee.save({ validateBeforeSave: false });

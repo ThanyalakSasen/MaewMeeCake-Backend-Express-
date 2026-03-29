@@ -1,17 +1,47 @@
 const ProductCategoryModel = require("../models/ProductCategoryModel");
 
+const normalizeCategoryResponse = (categoryDoc) => {
+  if (!categoryDoc) return categoryDoc;
+
+  const category = typeof categoryDoc.toObject === "function"
+    ? categoryDoc.toObject()
+    : { ...categoryDoc };
+
+  const normalizedName =
+    category.productcategoriesName ||
+    category.category_name ||
+    category.productCategory_name ||
+    "";
+
+  return {
+    ...category,
+    productcategoriesName: normalizedName,
+    category_name: normalizedName,
+    productCategory_name: normalizedName,
+  };
+};
+
 exports.createProductCategory = async (req, res) => {
   try {
-    const { name } = req.body;
+    const { name, category_name, productCategory_name, productcategoriesName } = req.body;
+    const normalizedName =
+      productcategoriesName || category_name || productCategory_name || name;
+
+    if (!normalizedName) {
+      return res.status(400).json({
+        success: false,
+        message: "กรุณาระบุชื่อหมวดหมู่",
+      });
+    }
 
     const newCategory = new ProductCategoryModel({
-      productCategory_name: name,
+      productcategoriesName: normalizedName,
     });
     const savedCategory = await newCategory.save();
     res.status(201).json({
       success: true,
       message: "สร้างหมวดหมู่สำเร็จ",
-      data: savedCategory,
+      data: normalizeCategoryResponse(savedCategory),
     });
   } catch (error) {
     res.status(500).json({
@@ -24,10 +54,12 @@ exports.createProductCategory = async (req, res) => {
 
 exports.getAllProductCategories = async (req, res) => {
   try {
-    const ProductCategories = await ProductCategoryModel.find();
+    const ProductCategories = await ProductCategoryModel.find({
+      $or: [{ softDelete: false }, { softDelete: { $exists: false } }],
+    });
     res.status(200).json({
       success: true,
-      data: ProductCategories,
+      data: ProductCategories.map(normalizeCategoryResponse),
     });
   } catch (error) {
     res.status(500).json({
@@ -49,7 +81,7 @@ exports.getProductCategoryById = async (req, res) => {
     }
     res.status(200).json({
       success: true,
-      data: ProductCategory,
+      data: normalizeCategoryResponse(ProductCategory),
     });
   } catch (error) {
     res.status(500).json({
@@ -63,10 +95,20 @@ exports.getProductCategoryById = async (req, res) => {
 exports.updateProductCategory = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name } = req.body;
+    const { name, category_name, productCategory_name, productcategoriesName } = req.body;
+    const normalizedName =
+      productcategoriesName || category_name || productCategory_name || name;
+
+    if (!normalizedName) {
+      return res.status(400).json({
+        success: false,
+        message: "กรุณาระบุชื่อหมวดหมู่",
+      });
+    }
+
     const updatedProductCategory = await ProductCategoryModel.findByIdAndUpdate(
       id,
-      { productCategory_name: name },
+      { productcategoriesName: normalizedName },
       { new: true },
     );
     if (!updatedProductCategory) {
@@ -78,7 +120,7 @@ exports.updateProductCategory = async (req, res) => {
     res.status(200).json({
       success: true,
       message: "อัพเดตหมวดหมู่สำเร็จ",
-      data: updatedCategory,
+      data: normalizeCategoryResponse(updatedProductCategory),
     });
   } catch (error) {
     res.status(500).json({
