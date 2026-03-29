@@ -28,11 +28,14 @@ exports.createProduct = async (req, res) => {
     const {
       product_name_th,
       product_name_eng,
+      productcategories,
       product_type,
       product_description,
       preparation_heating,
       recipe_id,
     } = req.body;
+
+    const resolvedProductCategory = productcategories || product_type;
 
     // Parse numeric values from FormData
     const product_price = parseFloat(req.body.product_price);
@@ -43,7 +46,9 @@ exports.createProduct = async (req, res) => {
     console.log("Parsed values:", {
       product_name_th,
       product_name_eng,
+      productcategories,
       product_type,
+      resolvedProductCategory,
       product_price,
       product_img,
       recipe_id
@@ -52,7 +57,7 @@ exports.createProduct = async (req, res) => {
     if (
       !product_name_th ||
       !product_name_eng ||
-      !product_type ||
+      !resolvedProductCategory ||
       isNaN(product_price)
     ) {
       return res.status(400).json({ message: "กรุณากรอกข้อมูลให้ครบถ้วน" });
@@ -62,10 +67,16 @@ exports.createProduct = async (req, res) => {
         .status(400)
         .json({ message: "ราคาสินค้าต้องไม่เป็นค่าลบ" });
     }
+
+    const existingProduct = await productModel.findOne({ product_name_th });
+    if (existingProduct) {
+      return res.status(409).json({ message: `มีสินค้าชื่อ "${product_name_th}" อยู่ในระบบแล้ว กรุณาใช้ชื่ออื่น` });
+    }
+
     const newProduct = new productModel({
       product_name_th,
       product_name_eng,
-      product_type,
+      productcategories: resolvedProductCategory,
       product_price,
       product_img,
       product_description,
@@ -96,6 +107,19 @@ exports.getAllProducts = async (req, res) => {
     res.status(500).json({ message: "Server Error", error });
   }
 };
+
+// Get all soft-deleted products
+exports.getDeletedProducts = async (req, res) => {
+  try {
+    const products = await productModel
+      .find({ softDelete: true })
+      .populate("recipe_id");
+
+    res.status(200).json(products);
+  } catch (error) {
+    res.status(500).json({ message: "Server Error", error });
+  }
+};
 // Get a product by ID
 exports.getProductById = async (req, res) => {
   try {
@@ -117,29 +141,46 @@ exports.updateProductById = async (req, res) => {
     const {
       product_name_th,
       product_name_eng,
-      product_type,
+      productcategories,
       product_price,
-
-      product_img,
       product_description,
       preparation_heating,
       recipe_id,
     } = req.body;
-    if (recipe_id && !(await recipeModel.findById(recipe_id)))
-      return res.status(400).json({ message: "ไม่พบสูตรอาหารที่ระบุ" });
+
+    if (!productcategories) {
+      return res.status(400).json({ message: "กรุณาเลือกประเภทสินค้า" });
+    }
+
+    if (recipe_id && recipe_id !== '') {
+      let recipeExists;
+      try {
+        recipeExists = await recipeModel.findById(recipe_id);
+      } catch {
+        return res.status(400).json({ message: "recipe_id ไม่ถูกต้อง" });
+      }
+      if (!recipeExists) {
+        return res.status(400).json({ message: "ไม่พบสูตรอาหารที่ระบุ" });
+      }
+    }
+
+    const updateData = {
+      product_name_th,
+      product_name_eng,
+      productcategories,
+      product_price,
+      product_description,
+      preparation_heating,
+      recipe_id: recipe_id && recipe_id !== '' ? recipe_id : null,
+    };
+
+    if (req.file) {
+      updateData.product_img = `/uploads/products/${req.file.filename}`;
+    }
+
     const updatedProduct = await productModel.findByIdAndUpdate(
       req.params.id,
-      {
-        product_name_th,
-        product_name_eng,
-        product_type,
-        product_price,
-
-        product_img,
-        product_description,
-        preparation_heating,
-        recipe_id,
-      },
+      updateData,
       { new: true },
     );
     if (!updatedProduct) {
@@ -147,7 +188,8 @@ exports.updateProductById = async (req, res) => {
     }
     res.status(200).json(updatedProduct);
   } catch (error) {
-    res.status(500).json({ message: "Server Error", error });
+    console.error("updateProductById error:", error);
+    res.status(500).json({ message: "Server Error", error: error.message });
   }
 };
 // Soft delete a product by ID

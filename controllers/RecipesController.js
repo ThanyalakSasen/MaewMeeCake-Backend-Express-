@@ -1,14 +1,117 @@
 const Recipe = require("../models/RecipesModel");
+const Product = require("../models/ProductModel");
+const TypeRecipe = require("../models/TypeRecipesModel");
 
 exports.createRecipe = async (req, res) => {
   try {
-    //...req.body คือการกระจายข้อมูลจาก req.body ไปยัง JSON object ใหม่ที่เราสร้างขึ้น โดยจะมีการเพิ่ม property components ที่เป็น array ของ ObjectId ที่อ้างอิงถึงส่วนประกอบสูตรอาหารที่เราเพิ่งสร้างขึ้นมา
+    const {
+      recipe_name,
+      product_id,
+      yield_per_batch,
+      typerecipes,
+      productcategories,
+      ingredients = [],
+      components = [],
+      steps = [],
+      recipe_note = null,
+      recipe_img = null,
+    } = req.body;
+
+    if (!recipe_name || String(recipe_name).trim() === "") {
+      return res.status(400).json({ message: "กรุณาระบุชื่อสูตร" });
+    }
+
+    let resolvedProductCategory = productcategories;
+    if (!resolvedProductCategory && product_id) {
+      const product = await Product.findById(product_id).select("productcategories");
+      resolvedProductCategory = product?.productcategories || null;
+    }
+    if (!resolvedProductCategory) {
+      return res.status(400).json({ message: "กรุณาเลือกหมวดหมู่สินค้า" });
+    }
+
+    let resolvedTypeRecipe = typerecipes;
+    if (!resolvedTypeRecipe) {
+      let defaultTypeRecipe = await TypeRecipe.findOne({ softDelete: false }).select("_id");
+
+      // Bootstrap default TypeRecipe for environments where seed data is missing.
+      if (!defaultTypeRecipe) {
+        defaultTypeRecipe = await TypeRecipe.create({
+          typerecipeName: "สูตรทั่วไป",
+          softDelete: false,
+        });
+      }
+
+      resolvedTypeRecipe = defaultTypeRecipe?._id || null;
+    }
+    if (!resolvedTypeRecipe) {
+      return res.status(400).json({ message: "ไม่พบข้อมูล TypeRecipe" });
+    }
+
+    const normalizedIngredients = Array.isArray(ingredients)
+      ? ingredients
+          .filter((item) => item?.ingredient_id && item?.unit_id && item?.quantity !== undefined)
+          .map((item) => ({
+            ingredient_id: item.ingredient_id,
+            ingredient_name: item.ingredient_name || null,
+            quantity: Number(item.quantity),
+            unit_id: item.unit_id,
+            note: item.note || null,
+          }))
+      : [];
+
+    const normalizedSteps = Array.isArray(steps)
+      ? steps
+          .filter((step) => step?.title && String(step.title).trim() !== "")
+          .map((step, index) => ({
+            step_number: step.step_number || index + 1,
+            title: String(step.title).trim(),
+            description: step.description || null,
+            duration_minutes: step.duration_minutes ?? null,
+            temperature_celsius: step.temperature_celsius ?? null,
+            substeps: Array.isArray(step.substeps)
+              ? step.substeps
+                  .filter((sub) => sub?.description && String(sub.description).trim() !== "")
+                  .map((sub, subIndex) => ({
+                    substep_number: sub.substep_number || subIndex + 1,
+                    description: String(sub.description).trim(),
+                  }))
+              : [],
+          }))
+      : [];
+
+    if (
+      normalizedIngredients.length === 0 &&
+      (!Array.isArray(components) || components.length === 0)
+    ) {
+      return res.status(400).json({ message: "ต้องมีส่วนผสมหรือ component อย่างน้อย 1 รายการ" });
+    }
+
+    if (normalizedSteps.length === 0) {
+      return res.status(400).json({ message: "ต้องมีขั้นตอนการทำอย่างน้อย 1 ขั้นตอน" });
+    }
+
     const recipe = await Recipe.create({
-      ...req.body,
-      components: componentIds,
+      recipe_name: String(recipe_name).trim(),
+      product_id: product_id || null,
+      yield_per_batch:
+        yield_per_batch !== undefined &&
+        yield_per_batch !== null &&
+        yield_per_batch !== ""
+          ? Number(yield_per_batch)
+          : null,
+      typerecipes: resolvedTypeRecipe,
+      productcategories: resolvedProductCategory,
+      ingredients: normalizedIngredients,
+      components: Array.isArray(components) ? components : [],
+      steps: normalizedSteps,
+      recipe_note,
+      recipe_img,
     });
-    res.status(201).json(recipe);
+
+    res.status(201).json({ success: true, data: recipe });
   } catch (err) {
+    console.error("createRecipe error:", err);
     res
       .status(500)
       .json({ message: "สร้างสูตรอาหารไม่สำเร็จ", error: err.message });
@@ -29,7 +132,6 @@ exports.getAllRecipes = async (req, res) => {
 exports.getRecipeById = async (req, res) => {
   try {
     const recipe = await Recipe.findById(req.params.id).populate("components");
-    r;
     res.json(recipe);
   } catch (err) {
     res

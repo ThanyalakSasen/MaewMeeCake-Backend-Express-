@@ -1,6 +1,6 @@
 // middleware/checkDuplicate.js
-const Recipe = require("../models/recipecomponentsModel");
-const Ingredient = require("../models/ingredientModel");
+const Recipe = require("../models/RecipesComponent");
+const Ingredient = require("../models/IngredientModel");
 
 // สำหรับเช็คชื่อสูตรอาหาร
 const checkRecipeName = async (req, res) => {
