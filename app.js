@@ -9,6 +9,8 @@ const helmet = require("helmet");
 const path = require("path"); 
 
 // ===== init =====
+connectDB();
+require("./config/passport");
 require("./models/UsersModel");
 require("./models/PositionModel");
 require("./models/UnitModel");

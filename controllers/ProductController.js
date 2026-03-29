@@ -1,7 +1,30 @@
 const productModel = require("../models/ProductModel");
 const recipeModel = require("../models/RecipesModel");
+const ProductCategoryModel = require("../models/ProductCategoryModel");
 const fs = require("fs");
 const path = require("path");
+
+const normalizeProductResponse = (productDoc) => {
+  if (!productDoc) return productDoc;
+
+  const product = typeof productDoc.toObject === "function"
+    ? productDoc.toObject()
+    : { ...productDoc };
+
+  const category = product.productcategories;
+  const categoryName =
+    category && typeof category === "object"
+      ? category.productcategoriesName ||
+        category.category_name ||
+        category.productCategory_name ||
+        ""
+      : "";
+
+  return {
+    ...product,
+    product_type: product.product_type || categoryName || product.productcategories,
+  };
+};
 
 // สร้างโฟลเดอร์ uploads/products ถ้ายังไม่มี
 const uploadDir = path.join(__dirname, "../uploads/products");
@@ -35,7 +58,7 @@ exports.createProduct = async (req, res) => {
       recipe_id,
     } = req.body;
 
-    const resolvedProductCategory = productcategories || product_type;
+    const normalizedCategoryId = productcategories || product_type;
 
     // Parse numeric values from FormData
     const product_price = parseFloat(req.body.product_price);
@@ -46,9 +69,7 @@ exports.createProduct = async (req, res) => {
     console.log("Parsed values:", {
       product_name_th,
       product_name_eng,
-      productcategories,
-      product_type,
-      resolvedProductCategory,
+      productcategories: normalizedCategoryId,
       product_price,
       product_img,
       recipe_id
@@ -57,11 +78,21 @@ exports.createProduct = async (req, res) => {
     if (
       !product_name_th ||
       !product_name_eng ||
-      !resolvedProductCategory ||
+      !normalizedCategoryId ||
       isNaN(product_price)
     ) {
       return res.status(400).json({ message: "กรุณากรอกข้อมูลให้ครบถ้วน" });
     }
+
+    const categoryExists = await ProductCategoryModel.findById(normalizedCategoryId);
+    if (!categoryExists) {
+      return res.status(400).json({ message: "ไม่พบประเภทสินค้าที่ระบุ" });
+    }
+
+    if (recipe_id && !(await recipeModel.findById(recipe_id))) {
+      return res.status(400).json({ message: "ไม่พบสูตรอาหารที่ระบุ" });
+    }
+
     if (product_price < 0) {
       return res
         .status(400)
@@ -76,7 +107,7 @@ exports.createProduct = async (req, res) => {
     const newProduct = new productModel({
       product_name_th,
       product_name_eng,
-      productcategories: resolvedProductCategory,
+      productcategories: normalizedCategoryId,
       product_price,
       product_img,
       product_description,
@@ -86,9 +117,13 @@ exports.createProduct = async (req, res) => {
     
     console.log("Creating product:", newProduct);
     const savedProduct = await newProduct.save();
+    const populatedProduct = await productModel
+      .findById(savedProduct._id)
+      .populate("recipe_id")
+      .populate("productcategories");
     console.log("Product saved successfully:", savedProduct._id);
     
-    res.status(201).json({ success: true, data: savedProduct });
+    res.status(201).json({ success: true, data: normalizeProductResponse(populatedProduct) });
   } catch (error) {
     console.error("Create Product Error:", error);
     res.status(500).json({ message: "Server Error", error: error.message });
@@ -99,10 +134,11 @@ exports.createProduct = async (req, res) => {
 exports.getAllProducts = async (req, res) => {
   try {
     const products = await productModel
-      .find({ softDelete: false })
-      .populate("recipe_id");
+      .find({ $or: [{ softDelete: false }, { softDelete: { $exists: false } }] })
+      .populate("recipe_id")
+      .populate("productcategories");
 
-    res.status(200).json(products);
+    res.status(200).json(products.map(normalizeProductResponse));
   } catch (error) {
     res.status(500).json({ message: "Server Error", error });
   }
@@ -125,11 +161,12 @@ exports.getProductById = async (req, res) => {
   try {
     const product = await productModel
       .findById(req.params.id)
-      .populate("recipe_id");
+      .populate("recipe_id")
+      .populate("productcategories");
     if (!product) {
       return res.status(404).json({ message: "ไม่พบสินค้าที่ระบุ" });
     }
-    res.status(200).json(product);
+    res.status(200).json(normalizeProductResponse(product));
   } catch (error) {
     res.status(500).json({ message: "Server Error", error });
   }
@@ -142,51 +179,68 @@ exports.updateProductById = async (req, res) => {
       product_name_th,
       product_name_eng,
       productcategories,
+      product_type,
       product_price,
+      product_img,
       product_description,
       preparation_heating,
       recipe_id,
     } = req.body;
 
-    if (!productcategories) {
-      return res.status(400).json({ message: "กรุณาเลือกประเภทสินค้า" });
+    const normalizedCategoryId = productcategories || product_type;
+    const updateData = {};
+
+    if (product_name_th !== undefined) updateData.product_name_th = product_name_th;
+    if (product_name_eng !== undefined) updateData.product_name_eng = product_name_eng;
+    if (normalizedCategoryId !== undefined) updateData.productcategories = normalizedCategoryId;
+    if (product_price !== undefined) updateData.product_price = parseFloat(product_price);
+    if (product_description !== undefined) updateData.product_description = product_description;
+    if (preparation_heating !== undefined) updateData.preparation_heating = preparation_heating;
+
+
+    if (normalizedCategoryId !== undefined) {
+      const categoryExists = await ProductCategoryModel.findById(normalizedCategoryId);
+      if (!categoryExists) {
+        return res.status(400).json({ message: "ไม่พบประเภทสินค้าที่ระบุ" });
+      }
+      updateData.productcategories = normalizedCategoryId;
     }
 
-    if (recipe_id && recipe_id !== '') {
-      let recipeExists;
-      try {
-        recipeExists = await recipeModel.findById(recipe_id);
-      } catch {
-        return res.status(400).json({ message: "recipe_id ไม่ถูกต้อง" });
+    if (req.body.product_price !== undefined) {
+      const numericPrice = parseFloat(req.body.product_price);
+      if (isNaN(numericPrice) || numericPrice < 0) {
+        return res.status(400).json({ message: "ราคาสินค้าไม่ถูกต้อง" });
       }
-      if (!recipeExists) {
+      updateData.product_price = numericPrice;
+    }
+
+    if (recipe_id !== undefined) {
+      if (recipe_id && !(await recipeModel.findById(recipe_id))) {
         return res.status(400).json({ message: "ไม่พบสูตรอาหารที่ระบุ" });
       }
+      updateData.recipe_id = recipe_id || null;
     }
-
-    const updateData = {
-      product_name_th,
-      product_name_eng,
-      productcategories,
-      product_price,
-      product_description,
-      preparation_heating,
-      recipe_id: recipe_id && recipe_id !== '' ? recipe_id : null,
-    };
 
     if (req.file) {
       updateData.product_img = `/uploads/products/${req.file.filename}`;
+    } else if (product_img !== undefined) {
+      updateData.product_img = product_img;
     }
 
     const updatedProduct = await productModel.findByIdAndUpdate(
       req.params.id,
       updateData,
-      { new: true },
+      { new: true, runValidators: true },
     );
     if (!updatedProduct) {
       return res.status(404).json({ message: "ไม่พบสินค้าที่ระบุ" });
     }
-    res.status(200).json(updatedProduct);
+    const populatedProduct = await productModel
+      .findById(updatedProduct._id)
+      .populate("recipe_id")
+      .populate("productcategories");
+
+    res.status(200).json(normalizeProductResponse(populatedProduct));
   } catch (error) {
     console.error("updateProductById error:", error);
     res.status(500).json({ message: "Server Error", error: error.message });

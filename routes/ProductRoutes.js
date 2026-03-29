@@ -1,6 +1,9 @@
 const productController = require('../controllers/ProductController');
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const { protect } = require('../middlewares/authMiddleware');
 const multer = require('multer');
 const path = require('path');
@@ -15,6 +18,24 @@ const storage = multer.diskStorage({
   }
 });
 const upload = multer({ storage: storage });
+
+const productUploadDir = path.join(process.cwd(), 'uploads', 'products');
+
+if (!fs.existsSync(productUploadDir)) {
+	fs.mkdirSync(productUploadDir, { recursive: true });
+}
+
+const storage = multer.diskStorage({
+	destination: (req, file, cb) => {
+		cb(null, productUploadDir);
+	},
+	filename: (req, file, cb) => {
+		const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+		cb(null, `${uniqueSuffix}${path.extname(file.originalname)}`);
+	},
+});
+
+const upload = multer({ storage });
 
 //Public Routes
 router.get('/allProduct', productController.getAllProducts);
